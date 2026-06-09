@@ -1,0 +1,42 @@
+{
+  "name": "backbillingmanager",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nicolasgs/BackBillingManager.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/nicolasgs/BackBillingManager/issues"
+  },
+  "homepage": "https://github.com/nicolasgs/BackBillingManager#readme",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "helmet": "^8.2.0",
+    "pg": "^8.21.0",
+    "reflect-metadata": "^0.2.2",
+    "typeorm": "^1.0.0",
+    "uuid": "^14.0.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.9.2",
+    "@types/uuid": "^10.0.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^6.0.3"
+  }
+}
