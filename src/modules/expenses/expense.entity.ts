@@ -3,38 +3,39 @@ import { BaseEntity } from '../../shared/entities/base.entity'
 import { TransactionSource, TransactionStatus } from '../../shared/enums'
 import { BillingCategoryEntity } from '../billing-categories/billing-category.entity'
 import { PaymentMethodTypeEntity } from '../payment-method-type/payment-method-type.entity'
+import { VendorEntity } from '../vendors/vendor.entity'
 
-@Entity('incomes')
-@Index(['companyId', 'incomeDate'])
-@Index(['companyId', 'clientId'])
-@Index(['companyId', 'caseId'])
-export class IncomeEntity extends BaseEntity {
+@Entity('expenses')
+@Index(['companyId', 'expenseDate'])
+@Index(['companyId', 'vendorId'])
+export class ExpenseEntity extends BaseEntity {
     @Column({ name: 'company_id', type: 'int' })
     companyId!: number
 
     @Column({ name: 'company_public_id', type: 'uuid', nullable: true })
     companyPublicId?: string | null
 
-    @Column({ name: 'client_id', type: 'int', nullable: true })
-    clientId?: number | null
+    @Column({ name: 'vendor_id', type: 'int', nullable: true })
+    vendorId?: number | null
 
-    @Column({ name: 'case_id', type: 'int', nullable: true })
-    caseId?: number | null
+    @ManyToOne(() => VendorEntity, { nullable: true })
+    @JoinColumn({ name: 'vendor_id' })
+    vendor?: VendorEntity | null
 
-    @Column({ name: 'client_public_id', type: 'uuid', nullable: true })
-    clientPublicId?: string | null
+    @Column({ name: 'vendor_public_id', type: 'uuid', nullable: true })
+    vendorPublicId?: string | null
 
-    @Column({ name: 'case_public_id', type: 'uuid', nullable: true })
-    casePublicId?: string | null
+    @Column({ name: 'vendor_name', type: 'varchar', length: 150, nullable: true })
+    vendorName?: string | null
 
     @Column({ type: 'numeric', precision: 12, scale: 2 })
     amount!: number
-    
+
     @Column({ type: 'varchar', length: 3, default: 'USD' })
     currency!: string
 
-    @Column({ name: 'income_date', type: 'date' })
-    incomeDate!: string
+    @Column({ name: 'expense_date', type: 'date' })
+    expenseDate!: string
 
     @Column({ name: 'category_id', type: 'int' })
     categoryId!: number

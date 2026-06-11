@@ -9,12 +9,14 @@ import {
     ListIncomesQueryDto,
     UpdateIncomeDto,
 } from './dto/income.dto'
+import { PeriodLockService } from '../monthly-closings/services/period-lock.service'
 
 export class IncomeService {
     constructor(
         private readonly incomeRepository = new IncomeRepository(),
         private readonly categoryRepository = new BillingCategoryRepository(),
-        private readonly paymentMethodRepository = new PaymentMethodTypeRepository()
+        private readonly paymentMethodRepository = new PaymentMethodTypeRepository(),
+        private readonly periodLockService = new PeriodLockService()
     ) {}
 
     async create(payload: CreateIncomeDto) {
@@ -23,6 +25,11 @@ export class IncomeService {
         companyId: payload.companyId,
         type: BillingCategoryType.INCOME,
         })
+
+        await this.periodLockService.validateOpenPeriod(
+        payload.companyId,
+        payload.incomeDate
+        )
 
         if (!category) {
         throw new ApiError(
@@ -69,6 +76,13 @@ export class IncomeService {
     async update(publicId: string, payload: UpdateIncomeDto) {
         const income = await this.findByPublicId(publicId)
 
+        const transactionDate = payload.incomeDate ?? income.incomeDate
+
+        await this.periodLockService.validateOpenPeriod(
+        income.companyId,
+        transactionDate
+        )
+
         const normalizedPayload = {
             ...payload,
             amount:
@@ -84,6 +98,11 @@ export class IncomeService {
 
     async softDelete(publicId: string) {
         const income = await this.findByPublicId(publicId)
+
+        await this.periodLockService.validateOpenPeriod(
+        income.companyId,
+        income.incomeDate
+        )
 
         await this.incomeRepository.softDeleteById(income.id)
 

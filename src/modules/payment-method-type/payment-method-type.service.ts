@@ -1,13 +1,17 @@
 import { ApiError } from '../../shared/errors'
 import { PaymentMethodTypeEntity } from './payment-method-type.entity'
 import { PaymentMethodTypeRepository } from './payment-method-type.repository'
+import {
+    CreatePaymentMethodTypeDto,
+    UpdatePaymentMethodTypeDto,
+} from './dto/payment-method-type.dto'
 
 export class PaymentMethodTypeService {
     constructor(
         private readonly repository = new PaymentMethodTypeRepository()
     ) {}
 
-    async create(payload: Partial<PaymentMethodTypeEntity>) {
+    async create(payload: CreatePaymentMethodTypeDto) {
         const existing = await this.repository.findByCode(payload.code!)
 
         if (existing) {
@@ -41,7 +45,7 @@ export class PaymentMethodTypeService {
         return paymentMethodType
     }
 
-    async update(code: string, payload: Partial<PaymentMethodTypeEntity>) {
+    async update(code: string, payload: UpdatePaymentMethodTypeDto) {
         const paymentMethodType = await this.findByCode(code)
 
         Object.assign(paymentMethodType, payload)

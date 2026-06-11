@@ -4,6 +4,10 @@ import { env } from '../config/env'
 import { BillingCategoryEntity } from '../modules/billing-categories/billing-category.entity'
 import { PaymentMethodTypeEntity } from '../modules/payment-method-type/payment-method-type.entity'
 import { IncomeEntity } from '../modules/incomes/income.entity'
+import { VendorEntity } from '../modules/vendors/vendor.entity'
+import { ExpenseEntity } from '../modules/expenses/expense.entity'
+import { MonthlyClosingEntity } from '../modules/monthly-closings/monthly-closing.entity'
+import { MonthlyClosingItemEntity } from '../modules/monthly-closings/monthly-closing-item.entity'
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -17,6 +21,10 @@ export const AppDataSource = new DataSource({
   entities: [
     BillingCategoryEntity,
     PaymentMethodTypeEntity,
-    IncomeEntity
+    IncomeEntity,
+    VendorEntity,
+    ExpenseEntity,
+    MonthlyClosingEntity,
+    MonthlyClosingItemEntity
   ],
 })

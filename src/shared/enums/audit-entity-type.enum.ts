@@ -1,0 +1,7 @@
+export enum AuditEntityType {
+    INCOME = 'INCOME',
+    EXPENSE = 'EXPENSE',
+    MONTHLY_CLOSING = 'MONTHLY_CLOSING',
+    VENDOR = 'VENDOR',
+    BILLING_CATEGORY = 'BILLING_CATEGORY',
+}

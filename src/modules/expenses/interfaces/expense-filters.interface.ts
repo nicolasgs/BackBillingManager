@@ -1,14 +1,12 @@
 import { TransactionStatus } from '../../../shared/enums'
 
-export interface IncomeFilters {
+export interface ExpenseFilters {
     companyId: number
-    companyPublicId?: string
+    companyPublicId?: string | null
 
-    clientId?: number
-    caseId?: number
-
-    clientPublicId?: string
-    casePublicId?: string
+    vendorId?: number
+    vendorPublicId?: string | null
+    vendorName?: string
 
     categoryId?: number
     paymentMethodCode?: string

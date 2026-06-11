@@ -29,7 +29,7 @@ export const createIncomeSchema = z.object({
     externalTransactionId: z.string().max(150).optional(),
 
     createdBy: z.string().uuid().optional(),
-    })
+})
 
 export const updateIncomeSchema = createIncomeSchema.partial().omit({
     companyId: true,
@@ -42,15 +42,19 @@ export const incomeParamsSchema = z.object({
 
 export const listIncomesQuerySchema = z.object({
     companyId: z.coerce.number().int().positive(),
+
     companyPublicId: z.string().uuid().optional(),
+
     clientId: z.coerce.number().int().positive().optional(),
     caseId: z.coerce.number().int().positive().optional(),
 
     clientPublicId: z.string().uuid().optional(),
     casePublicId: z.string().uuid().optional(),
+
     categoryId: z.coerce.number().int().positive().optional(),
     paymentMethodCode: z.string().min(2).max(20).optional(),
     status: z.nativeEnum(TransactionStatus).optional(),
+
     fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 })
