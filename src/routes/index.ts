@@ -7,6 +7,7 @@ import vendorRoutes from '../modules/vendors/vendor.routes'
 import expenseRoutes from '../modules/expenses/expense.routes'
 import dashboardRoutes from '../modules/dashboard/dashboard.routes'
 import monthlyClosingRoutes from '../modules/monthly-closings/monthly-closing.routes'
+import auditLogRoutes from '../modules/audit-logs/audit-log.routes'
 
 
 const router = Router()
@@ -19,5 +20,6 @@ router.use('/vendors', vendorRoutes)
 router.use('/expenses', expenseRoutes)
 router.use('/dashboard', dashboardRoutes)
 router.use('/monthly-closings', monthlyClosingRoutes)
+router.use('/audit-logs', auditLogRoutes)
 
 export default router

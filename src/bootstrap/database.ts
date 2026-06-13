@@ -8,6 +8,7 @@ import { VendorEntity } from '../modules/vendors/vendor.entity'
 import { ExpenseEntity } from '../modules/expenses/expense.entity'
 import { MonthlyClosingEntity } from '../modules/monthly-closings/monthly-closing.entity'
 import { MonthlyClosingItemEntity } from '../modules/monthly-closings/monthly-closing-item.entity'
+import { BillingAuditLogEntity } from '../modules/audit-logs/audit-log.entity'
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -25,6 +26,7 @@ export const AppDataSource = new DataSource({
     VendorEntity,
     ExpenseEntity,
     MonthlyClosingEntity,
-    MonthlyClosingItemEntity
+    MonthlyClosingItemEntity,
+    BillingAuditLogEntity
   ],
 })
