@@ -10,13 +10,19 @@ import {
     UpdateIncomeDto,
 } from './dto/income.dto'
 import { PeriodLockService } from '../monthly-closings/services/period-lock.service'
+import { AuditLogService } from '../audit-logs/audit-log.service'
+import {
+  AuditAction,
+  AuditEntityType
+} from '../../shared/enums'
 
 export class IncomeService {
     constructor(
         private readonly incomeRepository = new IncomeRepository(),
         private readonly categoryRepository = new BillingCategoryRepository(),
         private readonly paymentMethodRepository = new PaymentMethodTypeRepository(),
-        private readonly periodLockService = new PeriodLockService()
+        private readonly periodLockService = new PeriodLockService(),
+        private readonly auditLogService = new AuditLogService()
     ) {}
 
     async create(payload: CreateIncomeDto) {
@@ -56,6 +62,25 @@ export class IncomeService {
         amount: Number(Number(payload.amount).toFixed(2)),
         })
 
+         await this.auditLogService.log({
+            companyId: income.companyId,
+            companyPublicId: income.companyPublicId,
+
+            entityType: AuditEntityType.INCOME,
+            entityId: income.id,
+            entityPublicId: income.publicId,
+
+            action: AuditAction.CREATE,
+
+            newValues: income,
+
+            authContext: {
+                userId: income.createdBy ?? null,
+                companyId: income.companyId,
+                companyPublicId: income.companyPublicId ?? null,
+            },
+        })   
+
         return this.incomeRepository.save(income)
     }
 
@@ -76,39 +101,84 @@ export class IncomeService {
     async update(publicId: string, payload: UpdateIncomeDto) {
         const income = await this.findByPublicId(publicId)
 
+        const originalIncome = {
+            ...income,
+        }
+
         const transactionDate = payload.incomeDate ?? income.incomeDate
 
         await this.periodLockService.validateOpenPeriod(
-        income.companyId,
-        transactionDate
+            income.companyId,
+            transactionDate
         )
 
         const normalizedPayload = {
             ...payload,
             amount:
-                payload.amount !== undefined
+            payload.amount !== undefined
                 ? Number(Number(payload.amount).toFixed(2))
                 : undefined,
-            }
+        }
 
         Object.assign(income, normalizedPayload)
 
-        return this.incomeRepository.save(income)
+        const updatedIncome = await this.incomeRepository.save(income)
+
+        await this.auditLogService.log({
+            companyId: updatedIncome.companyId,
+            companyPublicId: updatedIncome.companyPublicId,
+
+            entityType: AuditEntityType.INCOME,
+            entityId: updatedIncome.id,
+            entityPublicId: updatedIncome.publicId,
+
+            action: AuditAction.UPDATE,
+
+            oldValues: originalIncome,
+            newValues: updatedIncome,
+
+            authContext: {
+            userId: updatedIncome.createdBy ?? null,
+            companyId: updatedIncome.companyId,
+            companyPublicId: updatedIncome.companyPublicId ?? null,
+            },
+        })
+
+        return updatedIncome
     }
 
     async softDelete(publicId: string) {
         const income = await this.findByPublicId(publicId)
 
         await this.periodLockService.validateOpenPeriod(
-        income.companyId,
-        income.incomeDate
+            income.companyId,
+            income.incomeDate
         )
 
         await this.incomeRepository.softDeleteById(income.id)
 
+        await this.auditLogService.log({
+            companyId: income.companyId,
+            companyPublicId: income.companyPublicId,
+
+            entityType: AuditEntityType.INCOME,
+            entityId: income.id,
+            entityPublicId: income.publicId,
+
+            action: AuditAction.DELETE,
+
+            oldValues: income,
+
+            authContext: {
+            userId: income.createdBy ?? null,
+            companyId: income.companyId,
+            companyPublicId: income.companyPublicId ?? null,
+            },
+        })
+
         return {
-        publicId: income.publicId,
-        deleted: true,
+            publicId: income.publicId,
+            deleted: true,
         }
     }
 }

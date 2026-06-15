@@ -7,10 +7,13 @@ import {
     ReopenMonthlyClosingDto,
 } from './dto/monthly-closing.dto'
 import { MonthlyClosingRepository } from './monthly-closing.repository'
+import { AuditAction, AuditEntityType } from '../../shared/enums'
+import { AuditLogService } from '../audit-logs/audit-log.service'
 
 export class MonthlyClosingService {
     constructor(
-        private readonly repository = new MonthlyClosingRepository()
+        private readonly repository = new MonthlyClosingRepository(),
+        private readonly auditLogService = new AuditLogService()
     ) {}
 
     async create(payload: CreateMonthlyClosingDto) {
@@ -36,7 +39,24 @@ export class MonthlyClosingService {
         netAmount: 0,
         })
 
-        return this.repository.save(closing)
+        const result = await this.repository.save(closing)
+
+        await this.auditLogService.log({
+        companyId: result.companyId,
+        companyPublicId: result.companyPublicId,
+        entityType: AuditEntityType.MONTHLY_CLOSING,
+        entityId: result.id,
+        entityPublicId: result.publicId,
+        action: AuditAction.CREATE,
+        newValues: result,
+        authContext: {
+            userId: result.createdBy ?? null,
+            companyId: result.companyId,
+            companyPublicId: result.companyPublicId ?? null,
+        },
+})
+
+return result
     }
 
     async findAll(filters: ListMonthlyClosingsQueryDto) {
@@ -112,7 +132,34 @@ export class MonthlyClosingService {
         closing.closedBy = payload.closedBy
         closing.closedAt = new Date()
 
-        return this.repository.save(closing)
+        const result = await this.repository.save(closing)
+
+        await this.auditLogService.log({
+        companyId: result.companyId,
+        companyPublicId: result.companyPublicId,
+        entityType: AuditEntityType.MONTHLY_CLOSING,
+        entityId: result.id,
+        entityPublicId: result.publicId,
+        action: AuditAction.CLOSE,
+        oldValues: {
+            status: closing.status,
+        },
+        newValues: {
+            status: ClosingStatus.CLOSED,
+            totalIncome: result.totalIncome,
+            totalExpense: result.totalExpense,
+            netAmount: result.netAmount,
+            closedBy: result.closedBy,
+            closedAt: result.closedAt,
+        },
+        authContext: {
+            userId: payload.closedBy,
+            companyId: result.companyId,
+            companyPublicId: result.companyPublicId ?? null,
+        },
+        })
+
+        return result
     }
 
     async reopen(publicId: string, payload: ReopenMonthlyClosingDto) {
@@ -129,6 +176,28 @@ export class MonthlyClosingService {
         closing.status = ClosingStatus.REOPENED
         closing.notes = payload.notes ?? closing.notes
 
-        return this.repository.save(closing)
+        const result = await this.repository.save(closing)
+
+        await this.auditLogService.log({
+        companyId: result.companyId,
+        companyPublicId: result.companyPublicId,
+        entityType: AuditEntityType.MONTHLY_CLOSING,
+        entityId: result.id,
+        entityPublicId: result.publicId,
+        action: AuditAction.REOPEN,
+        oldValues: {
+            status: ClosingStatus.CLOSED,
+        },
+        newValues: {
+            status: result.status,
+            notes: result.notes,
+        },
+        authContext: {
+            companyId: result.companyId,
+            companyPublicId: result.companyPublicId ?? null,
+        },
+        })
+
+        return result
     }
 }
