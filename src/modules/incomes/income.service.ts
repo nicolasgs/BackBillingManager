@@ -57,31 +57,33 @@ export class IncomeService {
         )
         }
 
-        const income = this.incomeRepository.createEntity({
+        const incomeEntity  = this.incomeRepository.createEntity({
         ...payload,
         amount: Number(Number(payload.amount).toFixed(2)),
         })
 
+        const income = this.incomeRepository.save(incomeEntity)
+
          await this.auditLogService.log({
-            companyId: income.companyId,
-            companyPublicId: income.companyPublicId,
+            companyId: incomeEntity .companyId,
+            companyPublicId: incomeEntity .companyPublicId,
 
             entityType: AuditEntityType.INCOME,
-            entityId: income.id,
-            entityPublicId: income.publicId,
+            entityId: incomeEntity .id,
+            entityPublicId: incomeEntity .publicId,
 
             action: AuditAction.CREATE,
 
-            newValues: income,
+            newValues: incomeEntity ,
 
             authContext: {
-                userId: income.createdBy ?? null,
-                companyId: income.companyId,
-                companyPublicId: income.companyPublicId ?? null,
+                userId: incomeEntity .createdBy ?? null,
+                companyId: incomeEntity .companyId,
+                companyPublicId: incomeEntity .companyPublicId ?? null,
             },
         })   
 
-        return this.incomeRepository.save(income)
+        return income 
     }
 
     async findAll(filters: ListIncomesQueryDto) {
