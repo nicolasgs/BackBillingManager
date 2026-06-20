@@ -33,7 +33,7 @@ export class MonthlyClosingEntity extends BaseEntity {
     @Column({ type: 'text', nullable: true })
     notes?: string | null
 
-    @Column({ name: 'closed_by', type: 'uuid', nullable: true })
+    @Column({ name: 'closed_by', type: 'varchar', length: 100, nullable: true })
     closedBy?: string | null
 
     @Column({ name: 'closed_at', type: 'timestamp', nullable: true })

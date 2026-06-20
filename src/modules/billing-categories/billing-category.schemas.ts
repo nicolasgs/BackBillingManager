@@ -9,7 +9,7 @@ export const createBillingCategorySchema = z.object({
     type: z.nativeEnum(BillingCategoryType),
     description: z.string().max(500).optional(),
     isActive: z.boolean().optional(),
-    createdBy: z.string().uuid().optional(),
+    createdBy: z.string().min(1).max(100).optional(),
     })
 
 export const updateBillingCategorySchema = z.object({

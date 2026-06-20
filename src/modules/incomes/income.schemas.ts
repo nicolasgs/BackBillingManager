@@ -3,7 +3,7 @@ import { TransactionSource, TransactionStatus } from '../../shared/enums'
 
 export const createIncomeSchema = z.object({
     companyId: z.coerce.number().int().positive(),
-    companyPublicId: z.string().uuid().optional(),
+    companyPublicId: z.string().uuid().nullable().optional(),
 
     clientId: z.coerce.number().int().positive().optional(),
     caseId: z.coerce.number().int().positive().optional(),
@@ -28,7 +28,7 @@ export const createIncomeSchema = z.object({
     externalProvider: z.string().max(50).optional(),
     externalTransactionId: z.string().max(150).optional(),
 
-    createdBy: z.string().uuid().optional(),
+    createdBy: z.string().min(1).max(100).optional()
 })
 
 export const updateIncomeSchema = createIncomeSchema.partial().omit({

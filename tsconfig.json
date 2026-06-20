@@ -8,6 +8,9 @@
     "esModuleInterop": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "skipLibCheck": true
-  }
+    "skipLibCheck": true,
+  },
+  "include": [
+    "src/**/*"
+  ]
 }

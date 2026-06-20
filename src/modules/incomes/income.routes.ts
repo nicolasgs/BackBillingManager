@@ -7,11 +7,17 @@ import {
     listIncomesQuerySchema,
     updateIncomeSchema,
 } from './income.schemas'
+import { injectAuthContextToBody } from '../../middlewares/inject-auth-context.middleware'
 
 const router = Router()
 const controller = new IncomeController()
 
-    router.post('/', validate(createIncomeSchema), controller.create)
+    router.post(
+        '/',
+        injectAuthContextToBody,
+        validate(createIncomeSchema),
+        controller.create
+    )
 
     router.get('/', validate(listIncomesQuerySchema, 'query'), controller.findAll)
 

@@ -7,7 +7,16 @@ const service = new IncomeService()
 export class IncomeController {
     create = async (req: Request, res: Response, next: NextFunction) => {
         try {
-        const income = await service.create(req.body)
+        const user = req.user
+
+        const payload = {
+        ...req.body,
+        companyId: user?.companyId,
+        companyPublicId: user?.companyPublicId ?? null,
+        createdBy: user?.id,
+        }
+
+        const income = await service.create(payload)
 
         return sendSuccess({
             res,
@@ -24,7 +33,15 @@ export class IncomeController {
 
     findAll = async (req: Request, res: Response, next: NextFunction) => {
         try {
-        const incomes = await service.findAll(req.query as any)
+        const user = req.user
+
+        const filters = {
+        ...req.query,
+        companyId: user?.companyId,
+        companyPublicId: user?.companyPublicId ?? undefined,
+        }
+
+        const incomes = await service.findAll(filters as any)
 
         return sendSuccess({
             res,

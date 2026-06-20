@@ -8,7 +8,7 @@ export const createMonthlyClosingSchema = z.object({
     month: z.coerce.number().int().min(1).max(12),
 
     notes: z.string().max(1000).nullable().optional(),
-    createdBy: z.string().uuid().optional(),
+    createdBy: z.string().min(1).max(100).optional(),
 })
 
 export const listMonthlyClosingsQuerySchema = z.object({
@@ -23,7 +23,7 @@ export const monthlyClosingParamsSchema = z.object({
 })
 
 export const closeMonthlyClosingSchema = z.object({
-    closedBy: z.string().uuid(),
+    closedBy: z.string().min(1).max(100),
 })
 
 export const reopenMonthlyClosingSchema = z

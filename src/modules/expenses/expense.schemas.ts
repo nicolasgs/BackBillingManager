@@ -26,7 +26,7 @@ export const createExpenseSchema = z.object({
     externalProvider: z.string().max(50).nullable().optional(),
     externalTransactionId: z.string().max(150).nullable().optional(),
 
-    createdBy: z.string().uuid().optional(),
+    createdBy: z.string().min(1).max(100).optional()
 })
 
 export const updateExpenseSchema = createExpenseSchema.partial().omit({

@@ -8,18 +8,31 @@ import expenseRoutes from '../modules/expenses/expense.routes'
 import dashboardRoutes from '../modules/dashboard/dashboard.routes'
 import monthlyClosingRoutes from '../modules/monthly-closings/monthly-closing.routes'
 import auditLogRoutes from '../modules/audit-logs/audit-log.routes'
+import reportsRoutes from '../modules/report/reports.routes'
 
+import { authMiddleware } from '../middlewares/auth.middleware'
 
 const router = Router()
 
 router.use('/health', healthRoutes)
-router.use('/billing-categories', billingCategoryRoutes)
-router.use('/payment-method-type', paymentMethodTypeRoutes)
-router.use('/incomes', incomeRoutes)
-router.use('/vendors', vendorRoutes)
-router.use('/expenses', expenseRoutes)
-router.use('/dashboard', dashboardRoutes)
-router.use('/monthly-closings', monthlyClosingRoutes)
-router.use('/audit-logs', auditLogRoutes)
+
+router.use(authMiddleware)
+
+router.use('/vendors', authMiddleware, vendorRoutes)
+router.use('/incomes', authMiddleware, incomeRoutes)
+router.use('/expenses', authMiddleware, expenseRoutes)
+router.use('/dashboard', authMiddleware, dashboardRoutes)
+router.use('/reports', authMiddleware, reportsRoutes)
+router.use('/audit-logs', authMiddleware, auditLogRoutes)
+router.use('/monthly-closings', authMiddleware, monthlyClosingRoutes)
+router.use('/billing-categories', authMiddleware, billingCategoryRoutes)
+router.use('/payment-method-type', authMiddleware, paymentMethodTypeRoutes)
+
+
+
+
+
+
+
 
 export default router

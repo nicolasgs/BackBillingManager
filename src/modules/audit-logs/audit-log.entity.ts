@@ -34,7 +34,7 @@ export class BillingAuditLogEntity {
   @Column({ name: 'new_values', type: 'jsonb', nullable: true })
   newValues?: any
 
-  @Column({ name: 'performed_by', type: 'uuid', nullable: true })
+  @Column({ name: 'performed_by', type: 'varchar', length: 100, nullable: true })
   performedBy?: string | null
 
   @Column({ name: 'performed_by_email', type: 'varchar', length: 150, nullable: true })

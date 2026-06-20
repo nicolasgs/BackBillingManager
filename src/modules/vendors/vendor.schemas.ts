@@ -12,7 +12,7 @@ export const createVendorSchema = z.object({
     notes: z.string().max(1000).nullable().optional(),
 
     isActive: z.boolean().optional(),
-    createdBy: z.string().uuid().optional(),
+    createdBy: z.string().min(1).max(100).optional()
     })
 
 export const updateVendorSchema = createVendorSchema.partial().omit({
