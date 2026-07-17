@@ -2,7 +2,6 @@ import { z } from 'zod'
 import { AuditAction, AuditEntityType } from '../../shared/enums'
 
 export const listAuditLogsQuerySchema = z.object({
-  companyId: z.coerce.number().int().positive(),
   entityType: z.nativeEnum(AuditEntityType).optional(),
   entityId: z.coerce.number().int().positive().optional(),
   entityPublicId: z.string().uuid().optional(),

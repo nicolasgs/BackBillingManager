@@ -10,7 +10,7 @@ export class BillingCategoryEntity extends BaseEntity {
     companyId!: number
 
     @Column({ name: 'company_public_id', type: 'uuid', nullable: true })
-    companyPublicId?: string
+    companyPublicId?: string | null
 
     @Column({ type: 'varchar', length: 120 })
     name!: string

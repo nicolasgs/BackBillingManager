@@ -7,11 +7,17 @@ import {
     listBillingCategoriesQuerySchema,
     updateBillingCategorySchema,
 } from './billing-category.schemas'
+import { injectAuthContextToBody } from '../../middlewares/inject-auth-context.middleware'
 
 const router = Router()
 const controller = new BillingCategoryController()
 
-    router.post('/', validate(createBillingCategorySchema), controller.create)
+    router.post(
+        '/',
+        injectAuthContextToBody,
+        validate(createBillingCategorySchema),
+        controller.create
+    )
 
     router.get(
         '/',

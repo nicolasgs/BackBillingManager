@@ -15,6 +15,8 @@ import {
   AuditAction,
   AuditEntityType
 } from '../../shared/enums'
+import { AuthContext } from '../audit-logs/interfaces/auth-context.interface'
+import { ExpenseFilters } from './interfaces/expense-filters.interface'
 
 export class ExpenseService {
     constructor(
@@ -26,7 +28,7 @@ export class ExpenseService {
         private readonly auditLogService = new AuditLogService()
     ) {}
 
-   async create(payload: CreateExpenseDto) {
+   async create(payload: CreateExpenseDto, authContext?: AuthContext) {
         const category = await this.categoryRepository.findByIdAndCompanyAndType({
             id: payload.categoryId,
             companyId: payload.companyId,
@@ -76,52 +78,57 @@ export class ExpenseService {
         }
 
         const expenseEntity = this.expenseRepository.createEntity({
-            ...payload,
-            vendorName,
-            vendorPublicId,
-            amount: Number(Number(payload.amount).toFixed(2)),
+        ...payload,
+        vendorName,
+        vendorPublicId,
+        amount: Number(Number(payload.amount).toFixed(2)),
         })
 
         const expense = await this.expenseRepository.save(expenseEntity)
 
         await this.auditLogService.log({
-            companyId: expense.companyId,
-            companyPublicId: expense.companyPublicId,
+        companyId: expense.companyId,
+        companyPublicId: expense.companyPublicId,
 
-            entityType: AuditEntityType.EXPENSE,
-            entityId: expense.id,
-            entityPublicId: expense.publicId,
+        entityType: AuditEntityType.EXPENSE,
+        entityId: expense.id,
+        entityPublicId: expense.publicId,
 
-            action: AuditAction.CREATE,
+        action: AuditAction.CREATE,
 
-            newValues: expense,
+        newValues: expense,
 
-            authContext: {
-            userId: expense.createdBy ?? null,
-            companyId: expense.companyId,
-            companyPublicId: expense.companyPublicId ?? null,
-            },
+        authContext,
         })
 
         return expense
     }
 
-    async findAll(filters: ListExpensesQueryDto) {
+    async findAll(filters: ExpenseFilters) {
         return this.expenseRepository.findAll(filters)
     }
 
-    async findByPublicId(publicId: string) {
+    async findByPublicId(publicId: string, companyId: number) {
         const expense = await this.expenseRepository.findByPublicId(publicId)
 
-        if (!expense) {
-        throw new ApiError(404, 'EXPENSE_NOT_FOUND', 'Expense not found')
+        if (!expense || expense.companyId !== companyId) {
+            throw new ApiError(
+            404,
+            'EXPENSE_NOT_FOUND',
+            'Expense not found'
+            )
         }
 
         return expense
     }
 
-    async update(publicId: string, payload: UpdateExpenseDto) {
-        const expense = await this.findByPublicId(publicId)
+    async update(
+        publicId: string,
+        payload: UpdateExpenseDto,
+        companyId: number,
+        authContext?: AuthContext
+        ) {
+        const expense = await this.findByPublicId(publicId, companyId)
 
         const originalExpense = {
             ...expense,
@@ -149,28 +156,24 @@ export class ExpenseService {
         await this.auditLogService.log({
             companyId: updatedExpense.companyId,
             companyPublicId: updatedExpense.companyPublicId,
-
             entityType: AuditEntityType.EXPENSE,
             entityId: updatedExpense.id,
             entityPublicId: updatedExpense.publicId,
-
             action: AuditAction.UPDATE,
-
             oldValues: originalExpense,
             newValues: updatedExpense,
-
-            authContext: {
-            userId: updatedExpense.createdBy ?? null,
-            companyId: updatedExpense.companyId,
-            companyPublicId: updatedExpense.companyPublicId ?? null,
-            },
+            authContext,
         })
 
         return updatedExpense
     }
 
-    async softDelete(publicId: string) {
-        const expense = await this.findByPublicId(publicId)
+    async softDelete(
+        publicId: string,
+        companyId: number,
+        authContext?: AuthContext
+        ) {
+        const expense = await this.findByPublicId(publicId, companyId)
 
         await this.periodLockService.validateOpenPeriod(
             expense.companyId,
@@ -182,20 +185,12 @@ export class ExpenseService {
         await this.auditLogService.log({
             companyId: expense.companyId,
             companyPublicId: expense.companyPublicId,
-
             entityType: AuditEntityType.EXPENSE,
             entityId: expense.id,
             entityPublicId: expense.publicId,
-
             action: AuditAction.DELETE,
-
             oldValues: expense,
-
-            authContext: {
-            userId: expense.createdBy ?? null,
-            companyId: expense.companyId,
-            companyPublicId: expense.companyPublicId ?? null,
-            },
+            authContext,
         })
 
         return {

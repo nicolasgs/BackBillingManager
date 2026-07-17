@@ -1,6 +1,7 @@
 import { Request } from 'express'
+import { AuthContext } from '../../modules/audit-logs/interfaces/auth-context.interface'
 
-export function buildAuthContext(req: Request) {
+export function buildAuthContext(req: Request): AuthContext {
   return {
     companyId: req.user?.companyId,
     companyPublicId: req.user?.companyPublicId ?? null,

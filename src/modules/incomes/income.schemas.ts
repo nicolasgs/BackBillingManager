@@ -41,9 +41,6 @@ export const incomeParamsSchema = z.object({
 })
 
 export const listIncomesQuerySchema = z.object({
-    companyId: z.coerce.number().int().positive(),
-
-    companyPublicId: z.string().uuid().optional(),
 
     clientId: z.coerce.number().int().positive().optional(),
     caseId: z.coerce.number().int().positive().optional(),

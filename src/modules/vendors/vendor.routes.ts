@@ -7,11 +7,17 @@ import {
     updateVendorSchema,
     vendorParamsSchema,
 } from './vendor.schemas'
+import { injectAuthContextToBody } from '../../middlewares/inject-auth-context.middleware'
 
     const router = Router()
     const controller = new VendorController()
 
-    router.post('/', validate(createVendorSchema), controller.create)
+    router.post(
+        '/',
+        injectAuthContextToBody,
+        validate(createVendorSchema),
+        controller.create
+    )
 
     router.get('/', validate(listVendorsQuerySchema, 'query'), controller.findAll)
 

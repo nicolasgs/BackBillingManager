@@ -1,5 +1,6 @@
 import { CreateAuditLogDto } from './dto/audit-log.dto'
 import { AuditLogRepository } from './audit-log.repository'
+import { AuditLogFilters } from './interfaces/audit-log-filters.interface'
 
 export class AuditLogService {
   constructor(
@@ -34,7 +35,7 @@ export class AuditLogService {
     return this.repository.save(log)
   }
 
-  async findAll(filters: any) {
+  async findAll(filters: AuditLogFilters) {
     return this.repository.findAll(filters)
   }
 }

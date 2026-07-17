@@ -1,203 +1,242 @@
-import { ApiError } from '../../shared/errors'
-import { ClosingItemType, ClosingStatus } from '../../shared/enums'
 import {
-    CloseMonthlyClosingDto,
-    CreateMonthlyClosingDto,
-    ListMonthlyClosingsQueryDto,
-    ReopenMonthlyClosingDto,
-} from './dto/monthly-closing.dto'
-import { MonthlyClosingRepository } from './monthly-closing.repository'
-import { AuditAction, AuditEntityType } from '../../shared/enums'
+  AuditAction,
+  AuditEntityType,
+  ClosingItemType,
+  ClosingStatus,
+} from '../../shared/enums'
+import { ApiError } from '../../shared/errors'
 import { AuditLogService } from '../audit-logs/audit-log.service'
+import { AuthContext } from '../audit-logs/interfaces/auth-context.interface'
+import {
+  CreateMonthlyClosingDto,
+  ReopenMonthlyClosingDto,
+} from './dto/monthly-closing.dto'
+import { MonthlyClosingFilters } from './interfaces/monthly-closing-filters.interface'
+import { MonthlyClosingRepository } from './monthly-closing.repository'
 
 export class MonthlyClosingService {
-    constructor(
-        private readonly repository = new MonthlyClosingRepository(),
-        private readonly auditLogService = new AuditLogService()
-    ) {}
+  constructor(
+    private readonly repository = new MonthlyClosingRepository(),
+    private readonly auditLogService = new AuditLogService()
+  ) {}
 
-    async create(payload: CreateMonthlyClosingDto) {
-        const existing = await this.repository.findExistingPeriod(
-        payload.companyId,
-        payload.year,
-        payload.month
-        )
+  async create(
+    payload: CreateMonthlyClosingDto,
+    authContext?: AuthContext
+  ) {
+    const existing = await this.repository.findExistingPeriod(
+      payload.companyId,
+      payload.year,
+      payload.month
+    )
 
-        if (existing) {
-        throw new ApiError(
-            409,
-            'MONTHLY_CLOSING_ALREADY_EXISTS',
-            'Monthly closing already exists for this company and period'
-        )
-        }
-
-        const closing = this.repository.createEntity({
-        ...payload,
-        status: ClosingStatus.DRAFT,
-        totalIncome: 0,
-        totalExpense: 0,
-        netAmount: 0,
-        })
-
-        const result = await this.repository.save(closing)
-
-        await this.auditLogService.log({
-        companyId: result.companyId,
-        companyPublicId: result.companyPublicId,
-        entityType: AuditEntityType.MONTHLY_CLOSING,
-        entityId: result.id,
-        entityPublicId: result.publicId,
-        action: AuditAction.CREATE,
-        newValues: result,
-        authContext: {
-            userId: result.createdBy ?? null,
-            companyId: result.companyId,
-            companyPublicId: result.companyPublicId ?? null,
-        },
-})
-
-return result
+    if (existing) {
+      throw new ApiError(
+        409,
+        'MONTHLY_CLOSING_ALREADY_EXISTS',
+        'Monthly closing already exists for this company and period'
+      )
     }
 
-    async findAll(filters: ListMonthlyClosingsQueryDto) {
-        return this.repository.findAll(filters as any)
+    const closingEntity = this.repository.createEntity({
+      ...payload,
+      status: ClosingStatus.DRAFT,
+      totalIncome: 0,
+      totalExpense: 0,
+      netAmount: 0,
+    })
+
+    const closing = await this.repository.save(closingEntity)
+
+    await this.auditLogService.log({
+      companyId: closing.companyId,
+      companyPublicId: closing.companyPublicId,
+      entityType: AuditEntityType.MONTHLY_CLOSING,
+      entityId: closing.id,
+      entityPublicId: closing.publicId,
+      action: AuditAction.CREATE,
+      newValues: closing,
+      authContext,
+    })
+
+    return closing
+  }
+
+  async findAll(filters: MonthlyClosingFilters) {
+    return this.repository.findAll(filters)
+  }
+
+  async findByPublicId(publicId: string, companyId: number) {
+    const closing = await this.repository.findByPublicId(publicId)
+
+    if (!closing || closing.companyId !== companyId) {
+      throw new ApiError(
+        404,
+        'MONTHLY_CLOSING_NOT_FOUND',
+        'Monthly closing not found'
+      )
     }
 
-    async findByPublicId(publicId: string) {
-        const closing = await this.repository.findByPublicId(publicId)
+    return closing
+  }
 
-        if (!closing) {
-        throw new ApiError(404, 'MONTHLY_CLOSING_NOT_FOUND', 'Monthly closing not found')
-        }
+  async close(
+    publicId: string,
+    companyId: number,
+    closedBy: string,
+    authContext?: AuthContext
+  ) {
+    const closing = await this.findByPublicId(publicId, companyId)
 
-        return closing
+    if (closing.status === ClosingStatus.CLOSED) {
+      throw new ApiError(
+        400,
+        'MONTHLY_CLOSING_ALREADY_CLOSED',
+        'Monthly closing is already closed'
+      )
     }
 
-    async close(publicId: string, payload: CloseMonthlyClosingDto) {
-        const closing = await this.findByPublicId(publicId)
+    const originalStatus = closing.status
 
-        if (closing.status === ClosingStatus.CLOSED) {
-        throw new ApiError(400, 'MONTHLY_CLOSING_ALREADY_CLOSED', 'Monthly closing is already closed')
-        }
+    const incomes = await this.repository.findPaidIncomesForPeriod(
+      closing.companyId,
+      closing.year,
+      closing.month
+    )
 
-        const incomes = await this.repository.findPaidIncomesForPeriod(
-        closing.companyId,
-        closing.year,
-        closing.month
-        )
+    const expenses = await this.repository.findPaidExpensesForPeriod(
+      closing.companyId,
+      closing.year,
+      closing.month
+    )
 
-        const expenses = await this.repository.findPaidExpensesForPeriod(
-        closing.companyId,
-        closing.year,
-        closing.month
-        )
+    const totalIncome = incomes.reduce(
+      (sum, item) => sum + Number(item.amount),
+      0
+    )
 
-        const totalIncome = incomes.reduce((sum, item) => sum + Number(item.amount), 0)
-        const totalExpense = expenses.reduce((sum, item) => sum + Number(item.amount), 0)
-        const netAmount = totalIncome - totalExpense
+    const totalExpense = expenses.reduce(
+      (sum, item) => sum + Number(item.amount),
+      0
+    )
 
-        await this.repository.deleteItemsByClosingId(closing.id)
+    const netAmount = totalIncome - totalExpense
 
-        const incomeItems = incomes.map((income) => ({
-        monthlyClosingId: closing.id,
-        companyId: closing.companyId,
-        companyPublicId: closing.companyPublicId,
-        entityType: ClosingItemType.INCOME,
-        entityId: income.id,
-        entityPublicId: income.publicId,
-        amount: Number(income.amount),
-        transactionDate: income.incomeDate,
-        categoryId: income.categoryId,
-        }))
+    await this.repository.deleteItemsByClosingId(closing.id)
 
-        const expenseItems = expenses.map((expense) => ({
-        monthlyClosingId: closing.id,
-        companyId: closing.companyId,
-        companyPublicId: closing.companyPublicId,
-        entityType: ClosingItemType.EXPENSE,
-        entityId: expense.id,
-        entityPublicId: expense.publicId,
-        amount: Number(expense.amount),
-        transactionDate: expense.expenseDate,
-        categoryId: expense.categoryId,
-        }))
+    const incomeItems = incomes.map((income) => ({
+      monthlyClosingId: closing.id,
+      companyId: closing.companyId,
+      companyPublicId: closing.companyPublicId,
+      entityType: ClosingItemType.INCOME,
+      entityId: income.id,
+      entityPublicId: income.publicId,
+      amount: Number(income.amount),
+      transactionDate: income.incomeDate,
+      categoryId: income.categoryId,
+    }))
 
-        const items = this.repository.createItems([...incomeItems, ...expenseItems])
-        await this.repository.saveItems(items)
+    const expenseItems = expenses.map((expense) => ({
+      monthlyClosingId: closing.id,
+      companyId: closing.companyId,
+      companyPublicId: closing.companyPublicId,
+      entityType: ClosingItemType.EXPENSE,
+      entityId: expense.id,
+      entityPublicId: expense.publicId,
+      amount: Number(expense.amount),
+      transactionDate: expense.expenseDate,
+      categoryId: expense.categoryId,
+    }))
 
-        closing.totalIncome = Number(totalIncome.toFixed(2))
-        closing.totalExpense = Number(totalExpense.toFixed(2))
-        closing.netAmount = Number(netAmount.toFixed(2))
-        closing.status = ClosingStatus.CLOSED
-        closing.closedBy = payload.closedBy
-        closing.closedAt = new Date()
+    const items = this.repository.createItems([
+      ...incomeItems,
+      ...expenseItems,
+    ])
 
-        const result = await this.repository.save(closing)
-
-        await this.auditLogService.log({
-        companyId: result.companyId,
-        companyPublicId: result.companyPublicId,
-        entityType: AuditEntityType.MONTHLY_CLOSING,
-        entityId: result.id,
-        entityPublicId: result.publicId,
-        action: AuditAction.CLOSE,
-        oldValues: {
-            status: closing.status,
-        },
-        newValues: {
-            status: ClosingStatus.CLOSED,
-            totalIncome: result.totalIncome,
-            totalExpense: result.totalExpense,
-            netAmount: result.netAmount,
-            closedBy: result.closedBy,
-            closedAt: result.closedAt,
-        },
-        authContext: {
-            userId: payload.closedBy,
-            companyId: result.companyId,
-            companyPublicId: result.companyPublicId ?? null,
-        },
-        })
-
-        return result
+    if (items.length > 0) {
+      await this.repository.saveItems(items)
     }
 
-    async reopen(publicId: string, payload: ReopenMonthlyClosingDto) {
-        const closing = await this.findByPublicId(publicId)
+    closing.totalIncome = Number(totalIncome.toFixed(2))
+    closing.totalExpense = Number(totalExpense.toFixed(2))
+    closing.netAmount = Number(netAmount.toFixed(2))
+    closing.status = ClosingStatus.CLOSED
+    closing.closedBy = closedBy
+    closing.closedAt = new Date()
 
-        if (closing.status !== ClosingStatus.CLOSED) {
-        throw new ApiError(
-            400,
-            'MONTHLY_CLOSING_NOT_CLOSED',
-            'Only closed monthly closings can be reopened'
-        )
-        }
+    const result = await this.repository.save(closing)
 
-        closing.status = ClosingStatus.REOPENED
-        closing.notes = payload.notes ?? closing.notes
+    await this.auditLogService.log({
+      companyId: result.companyId,
+      companyPublicId: result.companyPublicId,
+      entityType: AuditEntityType.MONTHLY_CLOSING,
+      entityId: result.id,
+      entityPublicId: result.publicId,
+      action: AuditAction.CLOSE,
+      oldValues: {
+        status: originalStatus,
+      },
+      newValues: {
+        status: result.status,
+        totalIncome: result.totalIncome,
+        totalExpense: result.totalExpense,
+        netAmount: result.netAmount,
+        closedBy: result.closedBy,
+        closedAt: result.closedAt,
+      },
+      authContext,
+    })
 
-        const result = await this.repository.save(closing)
+    return result
+  }
 
-        await this.auditLogService.log({
-        companyId: result.companyId,
-        companyPublicId: result.companyPublicId,
-        entityType: AuditEntityType.MONTHLY_CLOSING,
-        entityId: result.id,
-        entityPublicId: result.publicId,
-        action: AuditAction.REOPEN,
-        oldValues: {
-            status: ClosingStatus.CLOSED,
-        },
-        newValues: {
-            status: result.status,
-            notes: result.notes,
-        },
-        authContext: {
-            companyId: result.companyId,
-            companyPublicId: result.companyPublicId ?? null,
-        },
-        })
+  async reopen(
+    publicId: string,
+    payload: ReopenMonthlyClosingDto,
+    companyId: number,
+    authContext?: AuthContext
+  ) {
+    const closing = await this.findByPublicId(publicId, companyId)
 
-        return result
+    if (closing.status !== ClosingStatus.CLOSED) {
+      throw new ApiError(
+        400,
+        'MONTHLY_CLOSING_NOT_CLOSED',
+        'Only closed monthly closings can be reopened'
+      )
     }
+
+    const oldValues = {
+      status: closing.status,
+      closedBy: closing.closedBy,
+      closedAt: closing.closedAt,
+      notes: closing.notes,
+    }
+
+    closing.status = ClosingStatus.REOPENED
+    closing.notes = payload.notes ?? closing.notes
+    closing.closedBy = null
+    closing.closedAt = null
+
+    const result = await this.repository.save(closing)
+
+    await this.auditLogService.log({
+      companyId: result.companyId,
+      companyPublicId: result.companyPublicId,
+      entityType: AuditEntityType.MONTHLY_CLOSING,
+      entityId: result.id,
+      entityPublicId: result.publicId,
+      action: AuditAction.REOPEN,
+      oldValues,
+      newValues: {
+        status: result.status,
+        notes: result.notes,
+        closedBy: result.closedBy,
+        closedAt: result.closedAt,
+      },
+      authContext,
+    })
+
+    return result
+  }
 }

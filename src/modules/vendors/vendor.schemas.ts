@@ -25,8 +25,6 @@ export const vendorParamsSchema = z.object({
 })
 
 export const listVendorsQuerySchema = z.object({
-    companyId: z.coerce.number().int().positive(),
-    companyPublicId: z.string().uuid().nullable().optional(),
     search: z.string().max(150).optional(),
     isActive: z
         .string()

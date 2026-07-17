@@ -15,6 +15,8 @@ import {
   AuditAction,
   AuditEntityType
 } from '../../shared/enums'
+import { AuthContext } from '../audit-logs/interfaces/auth-context.interface'
+import { IncomeFilters } from './interfaces/income-filters.interface'
 
 export class IncomeService {
     constructor(
@@ -25,83 +27,88 @@ export class IncomeService {
         private readonly auditLogService = new AuditLogService()
     ) {}
 
-    async create(payload: CreateIncomeDto) {
+    async create(payload: CreateIncomeDto, authContext?: AuthContext) {
         const category = await this.categoryRepository.findByIdAndCompanyAndType({
-        id: payload.categoryId,
-        companyId: payload.companyId,
-        type: BillingCategoryType.INCOME,
+            id: payload.categoryId,
+            companyId: payload.companyId,
+            type: BillingCategoryType.INCOME,
         })
 
         await this.periodLockService.validateOpenPeriod(
-        payload.companyId,
-        payload.incomeDate
+            payload.companyId,
+            payload.incomeDate
         )
 
         if (!category) {
-        throw new ApiError(
+            throw new ApiError(
             400,
             'INVALID_INCOME_CATEGORY',
             'Invalid income category'
-        )
+            )
         }
 
         const paymentMethod = await this.paymentMethodRepository.findByCode(
-        payload.paymentMethodCode
+            payload.paymentMethodCode
         )
 
         if (!paymentMethod) {
-        throw new ApiError(
+            throw new ApiError(
             400,
             'INVALID_PAYMENT_METHOD',
             'Invalid payment method'
-        )
+            )
         }
 
-        const incomeEntity  = this.incomeRepository.createEntity({
-        ...payload,
-        amount: Number(Number(payload.amount).toFixed(2)),
+        const incomeEntity = this.incomeRepository.createEntity({
+            ...payload,
+            amount: Number(Number(payload.amount).toFixed(2)),
         })
 
-        const income = this.incomeRepository.save(incomeEntity)
+        const income = await this.incomeRepository.save(incomeEntity)
 
-         await this.auditLogService.log({
-            companyId: incomeEntity .companyId,
-            companyPublicId: incomeEntity .companyPublicId,
+        await this.auditLogService.log({
+            companyId: income.companyId,
+            companyPublicId: income.companyPublicId,
 
             entityType: AuditEntityType.INCOME,
-            entityId: incomeEntity .id,
-            entityPublicId: incomeEntity .publicId,
+            entityId: income.id,
+            entityPublicId: income.publicId,
 
             action: AuditAction.CREATE,
 
-            newValues: incomeEntity ,
+            newValues: income,
 
-            authContext: {
-                userId: incomeEntity .createdBy ?? null,
-                companyId: incomeEntity .companyId,
-                companyPublicId: incomeEntity .companyPublicId ?? null,
-            },
-        })   
+            authContext,
+        })
 
-        return income 
+        return income
     }
 
-    async findAll(filters: ListIncomesQueryDto) {
+    async findAll(filters: IncomeFilters) {
         return this.incomeRepository.findAll(filters)
     }
 
-    async findByPublicId(publicId: string) {
+    async findByPublicId(publicId: string, companyId: number) {
         const income = await this.incomeRepository.findByPublicId(publicId)
 
-        if (!income) {
-        throw new ApiError(404, 'INCOME_NOT_FOUND', 'Income not found')
+        if (!income || income.companyId !== companyId) {
+            throw new ApiError(
+            404,
+            'INCOME_NOT_FOUND',
+            'Income not found'
+            )
         }
 
         return income
     }
 
-    async update(publicId: string, payload: UpdateIncomeDto) {
-        const income = await this.findByPublicId(publicId)
+    async update(
+        publicId: string,
+        payload: UpdateIncomeDto,
+        companyId: number,
+        authContext?: AuthContext
+        ) {
+        const income = await this.findByPublicId(publicId, companyId)
 
         const originalIncome = {
             ...income,
@@ -129,28 +136,24 @@ export class IncomeService {
         await this.auditLogService.log({
             companyId: updatedIncome.companyId,
             companyPublicId: updatedIncome.companyPublicId,
-
             entityType: AuditEntityType.INCOME,
             entityId: updatedIncome.id,
             entityPublicId: updatedIncome.publicId,
-
             action: AuditAction.UPDATE,
-
             oldValues: originalIncome,
             newValues: updatedIncome,
-
-            authContext: {
-            userId: updatedIncome.createdBy ?? null,
-            companyId: updatedIncome.companyId,
-            companyPublicId: updatedIncome.companyPublicId ?? null,
-            },
+            authContext,
         })
 
         return updatedIncome
     }
 
-    async softDelete(publicId: string) {
-        const income = await this.findByPublicId(publicId)
+    async softDelete(
+        publicId: string,
+        companyId: number,
+        authContext?: AuthContext
+        ) {
+        const income = await this.findByPublicId(publicId, companyId)
 
         await this.periodLockService.validateOpenPeriod(
             income.companyId,
@@ -162,20 +165,12 @@ export class IncomeService {
         await this.auditLogService.log({
             companyId: income.companyId,
             companyPublicId: income.companyPublicId,
-
             entityType: AuditEntityType.INCOME,
             entityId: income.id,
             entityPublicId: income.publicId,
-
             action: AuditAction.DELETE,
-
             oldValues: income,
-
-            authContext: {
-            userId: income.createdBy ?? null,
-            companyId: income.companyId,
-            companyPublicId: income.companyPublicId ?? null,
-            },
+            authContext,
         })
 
         return {

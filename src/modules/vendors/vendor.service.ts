@@ -1,34 +1,39 @@
 import { ApiError } from '../../shared/errors'
 import {
-    CreateVendorDto,
-    ListVendorsQueryDto,
-    UpdateVendorDto,
+  CreateVendorDto,
+  ListVendorsQueryDto,
+  UpdateVendorDto,
 } from './dto/vendor.dto'
 import { VendorRepository } from './vendor.repository'
 import { AuditLogService } from '../audit-logs/audit-log.service'
 import {
   AuditAction,
-  AuditEntityType
+  AuditEntityType,
 } from '../../shared/enums'
+import { AuthContext } from '../audit-logs/interfaces/auth-context.interface'
+import { VendorFilters } from './interfaces/vendor-filters.interface'
 
 export class VendorService {
-    constructor(
-        private readonly repository = new VendorRepository(),
-        private readonly auditLogService = new AuditLogService()
-    ) {}
+  constructor(
+    private readonly repository = new VendorRepository(),
+    private readonly auditLogService = new AuditLogService()
+  ) {}
 
-    async create(payload: CreateVendorDto) {
+    async create(
+        payload: CreateVendorDto,
+        authContext?: AuthContext
+    ) {
         const existing = await this.repository.findExistingByCompanyAndName({
-            companyId: payload.companyId,
-            name: payload.name,
+        companyId: payload.companyId,
+        name: payload.name,
         })
 
         if (existing) {
-            throw new ApiError(
+        throw new ApiError(
             409,
             'VENDOR_ALREADY_EXISTS',
             'A vendor with this name already exists for this company'
-            )
+        )
         }
 
         const vendorEntity = this.repository.createEntity(payload)
@@ -36,31 +41,31 @@ export class VendorService {
         const vendor = await this.repository.save(vendorEntity)
 
         await this.auditLogService.log({
-            companyId: vendor.companyId,
-            companyPublicId: vendor.companyPublicId,
+        companyId: vendor.companyId,
+        companyPublicId: vendor.companyPublicId,
 
-            entityType: AuditEntityType.VENDOR,
-            entityId: vendor.id,
-            entityPublicId: vendor.publicId,
+        entityType: AuditEntityType.VENDOR,
+        entityId: vendor.id,
+        entityPublicId: vendor.publicId,
 
-            action: AuditAction.CREATE,
+        action: AuditAction.CREATE,
 
-            newValues: vendor,
+        newValues: vendor,
 
-            authContext: {
-            userId: vendor.createdBy ?? null,
-            companyId: vendor.companyId,
-            companyPublicId: vendor.companyPublicId ?? null,
-            },
+        authContext,
         })
 
         return vendor
     }
 
-    async findByPublicId(publicId: string) {
+    async findAll(filters: VendorFilters) {
+        return this.repository.findAll(filters)
+    }
+
+    async findByPublicId(publicId: string, companyId: number) {
         const vendor = await this.repository.findByPublicId(publicId)
 
-        if (!vendor) {
+        if (!vendor || vendor.companyId !== companyId) {
             throw new ApiError(
             404,
             'VENDOR_NOT_FOUND',
@@ -69,10 +74,15 @@ export class VendorService {
         }
 
         return vendor
-        }
+    }
 
-        async update(publicId: string, payload: UpdateVendorDto) {
-        const vendor = await this.findByPublicId(publicId)
+    async update(
+        publicId: string,
+        payload: UpdateVendorDto,
+        companyId: number,
+        authContext?: AuthContext
+        ) {
+        const vendor = await this.findByPublicId(publicId, companyId)
 
         const originalVendor = {
             ...vendor,
@@ -85,48 +95,36 @@ export class VendorService {
         await this.auditLogService.log({
             companyId: updatedVendor.companyId,
             companyPublicId: updatedVendor.companyPublicId,
-
             entityType: AuditEntityType.VENDOR,
             entityId: updatedVendor.id,
             entityPublicId: updatedVendor.publicId,
-
             action: AuditAction.UPDATE,
-
             oldValues: originalVendor,
             newValues: updatedVendor,
-
-            authContext: {
-            userId: updatedVendor.createdBy ?? null,
-            companyId: updatedVendor.companyId,
-            companyPublicId: updatedVendor.companyPublicId ?? null,
-            },
+            authContext,
         })
 
         return updatedVendor
     }
 
-    async softDelete(publicId: string) {
-        const vendor = await this.findByPublicId(publicId)
+    async softDelete(
+        publicId: string,
+        companyId: number,
+        authContext?: AuthContext
+        ) {
+        const vendor = await this.findByPublicId(publicId, companyId)
 
         await this.repository.softDeleteById(vendor.id)
 
         await this.auditLogService.log({
             companyId: vendor.companyId,
             companyPublicId: vendor.companyPublicId,
-
             entityType: AuditEntityType.VENDOR,
             entityId: vendor.id,
             entityPublicId: vendor.publicId,
-
             action: AuditAction.DELETE,
-
             oldValues: vendor,
-
-            authContext: {
-            userId: vendor.createdBy ?? null,
-            companyId: vendor.companyId,
-            companyPublicId: vendor.companyPublicId ?? null,
-            },
+            authContext,
         })
 
         return {

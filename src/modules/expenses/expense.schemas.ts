@@ -39,8 +39,6 @@ export const expenseParamsSchema = z.object({
 })
 
 export const listExpensesQuerySchema = z.object({
-    companyId: z.coerce.number().int().positive(),
-    companyPublicId: z.string().uuid().nullable().optional(),
 
     vendorId: z.coerce.number().int().positive().optional(),
     vendorPublicId: z.string().uuid().nullable().optional(),

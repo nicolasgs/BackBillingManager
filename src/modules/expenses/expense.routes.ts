@@ -7,11 +7,16 @@ import {
     listExpensesQuerySchema,
     updateExpenseSchema,
 } from './expense.schemas'
+import { injectAuthContextToBody } from '../../middlewares/inject-auth-context.middleware'
 
 const router = Router()
 const controller = new ExpenseController()
 
-    router.post('/', validate(createExpenseSchema), controller.create)
+     router.post(
+            '/',
+            injectAuthContextToBody,
+            validate(createExpenseSchema), 
+            controller.create)
 
     router.get('/', validate(listExpensesQuerySchema, 'query'), controller.findAll)
 
