@@ -17,17 +17,20 @@ export const AppDataSource = new DataSource({
   username: env.DB_USERNAME,
   password: env.DB_PASSWORD,
   database: env.DB_DATABASE,
+
   synchronize: env.DB_SYNCHRONIZE,
   logging: env.DB_LOGGING,
-  ssl:
-    env.NODE_ENV === 'production'
-      ? {
-          rejectUnauthorized: false,
-        }
-      : false,
+
+  ssl: env.DB_SSL
+    ? {
+        rejectUnauthorized: false,
+      }
+    : false,
+
   extra: {
-      max: 10,
-      },
+    max: 10,
+  },
+
   entities: [
     BillingCategoryEntity,
     PaymentMethodTypeEntity,
@@ -36,6 +39,6 @@ export const AppDataSource = new DataSource({
     ExpenseEntity,
     MonthlyClosingEntity,
     MonthlyClosingItemEntity,
-    BillingAuditLogEntity
+    BillingAuditLogEntity,
   ],
 })

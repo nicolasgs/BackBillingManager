@@ -15,6 +15,7 @@ export const env = {
   DB_DATABASE: process.env.DB_NAME ?? 'mindpro_crm_dev',
   DB_SYNCHRONIZE: process.env.DB_SYNCHRONIZE === 'true',
   DB_LOGGING: process.env.DB_LOGGING === 'true',
+  DB_SSL: process.env.DB_SSL === 'true',
 
   // Security
   INTERNAL_API_KEY: process.env.INTERNAL_API_KEY ?? '',

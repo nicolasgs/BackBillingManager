@@ -45,5 +45,7 @@ __decorate([
 ], BillingCategoryEntity.prototype, "isActive", void 0);
 exports.BillingCategoryEntity = BillingCategoryEntity = __decorate([
     (0, typeorm_1.Entity)('billing_categories'),
+    (0, typeorm_1.Index)(['companyId']),
+    (0, typeorm_1.Index)(['companyPublicId']),
     (0, typeorm_1.Index)(['companyId', 'name', 'type'], { unique: true })
 ], BillingCategoryEntity);

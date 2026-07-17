@@ -1,57 +1,142 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeorm'
+import {
+  BeforeInsert,
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  PrimaryGeneratedColumn,
+} from 'typeorm'
 import { v4 as uuidv4 } from 'uuid'
 import { AuditAction, AuditEntityType } from '../../shared/enums'
 
+type AuditValues = Record<string, unknown>
+
 @Entity('billing_audit_logs')
+@Index(['companyId', 'createdAt'])
+@Index(['companyId', 'entityType', 'entityPublicId'])
+@Index(['companyId', 'action'])
 export class BillingAuditLogEntity {
   @PrimaryGeneratedColumn()
   id!: number
 
-  @Column({ name: 'public_id', type: 'uuid', unique: true })
-  publicId: string = uuidv4()
+  @Column({
+    name: 'public_id',
+    type: 'uuid',
+    unique: true,
+  })
+  publicId!: string
 
-  @Column({ name: 'company_id', type: 'int' })
+  @BeforeInsert()
+  generatePublicId(): void {
+    if (!this.publicId) {
+      this.publicId = uuidv4()
+    }
+  }
+
+  @Column({
+    name: 'company_id',
+    type: 'int',
+  })
   companyId!: number
 
-  @Column({ name: 'company_public_id', type: 'uuid', nullable: true })
+  @Column({
+    name: 'company_public_id',
+    type: 'uuid',
+    nullable: true,
+  })
   companyPublicId?: string | null
 
-  @Column({ name: 'entity_type', type: 'enum', enum: AuditEntityType })
+  @Column({
+    name: 'entity_type',
+    type: 'enum',
+    enum: AuditEntityType,
+  })
   entityType!: AuditEntityType
 
-  @Column({ name: 'entity_id', type: 'int', nullable: true })
+  @Column({
+    name: 'entity_id',
+    type: 'int',
+    nullable: true,
+  })
   entityId?: number | null
 
-  @Column({ name: 'entity_public_id', type: 'uuid', nullable: true })
+  @Column({
+    name: 'entity_public_id',
+    type: 'uuid',
+    nullable: true,
+  })
   entityPublicId?: string | null
 
-  @Column({ type: 'enum', enum: AuditAction })
+  @Column({
+    type: 'enum',
+    enum: AuditAction,
+  })
   action!: AuditAction
 
-  @Column({ name: 'old_values', type: 'jsonb', nullable: true })
-  oldValues?: any
+  @Column({
+    name: 'old_values',
+    type: 'jsonb',
+    nullable: true,
+  })
+  oldValues?: AuditValues | null
 
-  @Column({ name: 'new_values', type: 'jsonb', nullable: true })
-  newValues?: any
+  @Column({
+    name: 'new_values',
+    type: 'jsonb',
+    nullable: true,
+  })
+  newValues?: AuditValues | null
 
-  @Column({ name: 'performed_by', type: 'varchar', length: 100, nullable: true })
+  @Column({
+    name: 'performed_by',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
   performedBy?: string | null
 
-  @Column({ name: 'performed_by_email', type: 'varchar', length: 150, nullable: true })
+  @Column({
+    name: 'performed_by_email',
+    type: 'varchar',
+    length: 254,
+    nullable: true,
+  })
   performedByEmail?: string | null
 
-  @Column({ name: 'performed_by_username', type: 'varchar', length: 150, nullable: true })
+  @Column({
+    name: 'performed_by_username',
+    type: 'varchar',
+    length: 150,
+    nullable: true,
+  })
   performedByUsername?: string | null
 
-  @Column({ name: 'performed_by_role', type: 'varchar', length: 80, nullable: true })
+  @Column({
+    name: 'performed_by_role',
+    type: 'varchar',
+    length: 80,
+    nullable: true,
+  })
   performedByRole?: string | null
 
-  @Column({ name: 'ip_address', type: 'varchar', length: 80, nullable: true })
+  @Column({
+    name: 'ip_address',
+    type: 'varchar',
+    length: 45,
+    nullable: true,
+  })
   ipAddress?: string | null
 
-  @Column({ name: 'user_agent', type: 'text', nullable: true })
+  @Column({
+    name: 'user_agent',
+    type: 'text',
+    nullable: true,
+  })
   userAgent?: string | null
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({
+    name: 'created_at',
+    type: 'timestamptz',
+  })
   createdAt!: Date
 }

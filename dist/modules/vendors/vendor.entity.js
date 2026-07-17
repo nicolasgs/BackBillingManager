@@ -20,38 +20,70 @@ __decorate([
     __metadata("design:type", Number)
 ], VendorEntity.prototype, "companyId", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'company_public_id', type: 'uuid', nullable: true }),
+    (0, typeorm_1.Column)({
+        name: 'company_public_id',
+        type: 'uuid',
+        nullable: true,
+    }),
     __metadata("design:type", Object)
 ], VendorEntity.prototype, "companyPublicId", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: 'varchar', length: 150 }),
+    (0, typeorm_1.Column)({
+        type: 'varchar',
+        length: 150,
+    }),
     __metadata("design:type", String)
 ], VendorEntity.prototype, "name", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: 'varchar', length: 150, nullable: true }),
+    (0, typeorm_1.Column)({
+        type: 'varchar',
+        length: 254,
+        nullable: true,
+    }),
     __metadata("design:type", Object)
 ], VendorEntity.prototype, "email", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: 'varchar', length: 30, nullable: true }),
+    (0, typeorm_1.Column)({
+        type: 'varchar',
+        length: 30,
+        nullable: true,
+    }),
     __metadata("design:type", Object)
 ], VendorEntity.prototype, "phone", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: 'varchar', length: 150, nullable: true }),
+    (0, typeorm_1.Column)({
+        type: 'varchar',
+        length: 255,
+        nullable: true,
+    }),
     __metadata("design:type", Object)
 ], VendorEntity.prototype, "website", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'tax_id', type: 'varchar', length: 50, nullable: true }),
+    (0, typeorm_1.Column)({
+        name: 'tax_id',
+        type: 'varchar',
+        length: 50,
+        nullable: true,
+    }),
     __metadata("design:type", Object)
 ], VendorEntity.prototype, "taxId", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: 'text', nullable: true }),
+    (0, typeorm_1.Column)({
+        type: 'text',
+        nullable: true,
+    }),
     __metadata("design:type", Object)
 ], VendorEntity.prototype, "notes", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'is_active', type: 'boolean', default: true }),
+    (0, typeorm_1.Column)({
+        name: 'is_active',
+        type: 'boolean',
+        default: true,
+    }),
     __metadata("design:type", Boolean)
 ], VendorEntity.prototype, "isActive", void 0);
 exports.VendorEntity = VendorEntity = __decorate([
     (0, typeorm_1.Entity)('vendors'),
-    (0, typeorm_1.Index)(['companyId', 'name'])
+    (0, typeorm_1.Index)(['companyId', 'name']),
+    (0, typeorm_1.Index)(['companyId', 'taxId'])
 ], VendorEntity);

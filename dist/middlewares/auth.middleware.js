@@ -72,7 +72,6 @@ async function authMiddleware(req, res, next) {
         }
         const groups = accessPayload['cognito:groups'];
         const roles = Array.isArray(groups) ? groups.map(String) : [];
-        console.log('ID TOKEN PAYLOAD:', JSON.stringify(idPayload, null, 2));
         req.user = {
             id: String(idPayload.sub),
             email: idPayload.email ? String(idPayload.email) : undefined,
@@ -90,7 +89,6 @@ async function authMiddleware(req, res, next) {
                 ? String(idPayload.family_name)
                 : undefined,
         };
-        console.log('REQ USER:', req.user);
         next();
     }
     catch (error) {

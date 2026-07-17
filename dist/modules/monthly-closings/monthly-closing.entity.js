@@ -12,53 +12,101 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.MonthlyClosingEntity = void 0;
 const typeorm_1 = require("typeorm");
 const base_entity_1 = require("../../shared/entities/base.entity");
+const numeric_transformer_1 = require("../../shared/database/numeric.transformer");
 const enums_1 = require("../../shared/enums");
 const monthly_closing_item_entity_1 = require("./monthly-closing-item.entity");
 let MonthlyClosingEntity = class MonthlyClosingEntity extends base_entity_1.BaseEntity {
 };
 exports.MonthlyClosingEntity = MonthlyClosingEntity;
 __decorate([
-    (0, typeorm_1.Column)({ name: 'company_id', type: 'int' }),
+    (0, typeorm_1.Column)({
+        name: 'company_id',
+        type: 'int',
+    }),
     __metadata("design:type", Number)
 ], MonthlyClosingEntity.prototype, "companyId", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'company_public_id', type: 'uuid', nullable: true }),
+    (0, typeorm_1.Column)({
+        name: 'company_public_id',
+        type: 'uuid',
+        nullable: true,
+    }),
     __metadata("design:type", Object)
 ], MonthlyClosingEntity.prototype, "companyPublicId", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: 'int' }),
+    (0, typeorm_1.Column)({
+        type: 'int',
+    }),
     __metadata("design:type", Number)
 ], MonthlyClosingEntity.prototype, "year", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: 'int' }),
+    (0, typeorm_1.Column)({
+        type: 'int',
+    }),
     __metadata("design:type", Number)
 ], MonthlyClosingEntity.prototype, "month", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'total_income', type: 'numeric', precision: 12, scale: 2, default: 0 }),
+    (0, typeorm_1.Column)({
+        name: 'total_income',
+        type: 'numeric',
+        precision: 12,
+        scale: 2,
+        default: 0,
+        transformer: numeric_transformer_1.numericTransformer,
+    }),
     __metadata("design:type", Number)
 ], MonthlyClosingEntity.prototype, "totalIncome", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'total_expense', type: 'numeric', precision: 12, scale: 2, default: 0 }),
+    (0, typeorm_1.Column)({
+        name: 'total_expense',
+        type: 'numeric',
+        precision: 12,
+        scale: 2,
+        default: 0,
+        transformer: numeric_transformer_1.numericTransformer,
+    }),
     __metadata("design:type", Number)
 ], MonthlyClosingEntity.prototype, "totalExpense", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'net_amount', type: 'numeric', precision: 12, scale: 2, default: 0 }),
+    (0, typeorm_1.Column)({
+        name: 'net_amount',
+        type: 'numeric',
+        precision: 12,
+        scale: 2,
+        default: 0,
+        transformer: numeric_transformer_1.numericTransformer,
+    }),
     __metadata("design:type", Number)
 ], MonthlyClosingEntity.prototype, "netAmount", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: 'enum', enum: enums_1.ClosingStatus, default: enums_1.ClosingStatus.DRAFT }),
+    (0, typeorm_1.Column)({
+        type: 'enum',
+        enum: enums_1.ClosingStatus,
+        default: enums_1.ClosingStatus.DRAFT,
+    }),
     __metadata("design:type", String)
 ], MonthlyClosingEntity.prototype, "status", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: 'text', nullable: true }),
+    (0, typeorm_1.Column)({
+        type: 'text',
+        nullable: true,
+    }),
     __metadata("design:type", Object)
 ], MonthlyClosingEntity.prototype, "notes", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'closed_by', type: 'varchar', length: 100, nullable: true }),
+    (0, typeorm_1.Column)({
+        name: 'closed_by',
+        type: 'uuid',
+        nullable: true,
+    }),
     __metadata("design:type", Object)
 ], MonthlyClosingEntity.prototype, "closedBy", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'closed_at', type: 'timestamp', nullable: true }),
+    (0, typeorm_1.Column)({
+        name: 'closed_at',
+        type: 'timestamptz',
+        nullable: true,
+    }),
     __metadata("design:type", Object)
 ], MonthlyClosingEntity.prototype, "closedAt", void 0);
 __decorate([
@@ -67,5 +115,7 @@ __decorate([
 ], MonthlyClosingEntity.prototype, "items", void 0);
 exports.MonthlyClosingEntity = MonthlyClosingEntity = __decorate([
     (0, typeorm_1.Entity)('monthly_closings'),
-    (0, typeorm_1.Index)(['companyId', 'year', 'month'], { unique: true })
+    (0, typeorm_1.Index)(['companyId', 'year', 'month'], { unique: true }),
+    (0, typeorm_1.Check)(`"month" BETWEEN 1 AND 12`),
+    (0, typeorm_1.Check)(`"year" BETWEEN 2000 AND 2100`)
 ], MonthlyClosingEntity);

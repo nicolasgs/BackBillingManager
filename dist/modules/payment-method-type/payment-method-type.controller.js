@@ -40,7 +40,7 @@ class PaymentMethodTypeController {
         this.findOne = async (req, res, next) => {
             try {
                 const { code } = req.params;
-                const paymentMethodType = await service.findByCode(code.toUpperCase());
+                const paymentMethodType = await service.findByCode(code);
                 return (0, responses_1.sendSuccess)({
                     res,
                     req,
@@ -56,7 +56,7 @@ class PaymentMethodTypeController {
         this.update = async (req, res, next) => {
             try {
                 const { code } = req.params;
-                const paymentMethodType = await service.update(code.toUpperCase(), req.body);
+                const paymentMethodType = await service.update(code, req.body);
                 return (0, responses_1.sendSuccess)({
                     res,
                     req,
@@ -72,7 +72,7 @@ class PaymentMethodTypeController {
         this.remove = async (req, res, next) => {
             try {
                 const { code } = req.params;
-                const result = await service.softDelete(code.toUpperCase());
+                const result = await service.softDelete(code);
                 return (0, responses_1.sendSuccess)({
                     res,
                     req,

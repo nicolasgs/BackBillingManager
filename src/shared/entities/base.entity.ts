@@ -1,28 +1,51 @@
 import {
-    CreateDateColumn,
-    DeleteDateColumn,
-    PrimaryGeneratedColumn,
-    UpdateDateColumn,
-    Column,
+  BeforeInsert,
+  Column,
+  CreateDateColumn,
+  DeleteDateColumn,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm'
 import { v4 as uuidv4 } from 'uuid'
 
 export abstract class BaseEntity {
-    @PrimaryGeneratedColumn()
-    id!: number
+  @PrimaryGeneratedColumn()
+  id!: number
 
-    @Column({ name: 'public_id', type: 'uuid', unique: true })
-    publicId: string = uuidv4()
+  @Column({
+    name: 'public_id',
+    type: 'uuid',
+    unique: true,
+  })
+  publicId!: string
 
-    @Column({ name: 'created_by', type: 'uuid', nullable: true })
-    createdBy?: string | null
+  @Column({
+    name: 'created_by',
+    type: 'uuid',
+    nullable: true,
+  })
+  createdBy?: string | null
 
-    @CreateDateColumn({ name: 'created_at' })
-    createdAt!: Date
+  @CreateDateColumn({
+    name: 'created_at',
+  })
+  createdAt!: Date
 
-    @UpdateDateColumn({ name: 'updated_at' })
-    updatedAt!: Date
+  @UpdateDateColumn({
+    name: 'updated_at',
+  })
+  updatedAt!: Date
 
-    @DeleteDateColumn({ name: 'deleted_at', nullable: true })
-    deletedAt?: Date | null
+  @DeleteDateColumn({
+    name: 'deleted_at',
+    nullable: true,
+  })
+  deletedAt?: Date | null
+
+  @BeforeInsert()
+  generatePublicId(): void {
+    if (!this.publicId) {
+      this.publicId = uuidv4()
+    }
+  }
 }

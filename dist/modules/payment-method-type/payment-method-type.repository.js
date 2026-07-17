@@ -27,13 +27,24 @@ class PaymentMethodTypeRepository {
     findByCode(code) {
         return this.repository.findOne({
             where: {
-                code,
+                code: code.toUpperCase(),
                 deletedAt: (0, typeorm_1.IsNull)(),
             },
         });
     }
+    findByCodeIncludingDeleted(code) {
+        return this.repository.findOne({
+            where: {
+                code: code.toUpperCase(),
+            },
+            withDeleted: true,
+        });
+    }
+    async restoreByCode(code) {
+        await this.repository.restore(code.toUpperCase());
+    }
     softDeleteByCode(code) {
-        return this.repository.softDelete(code);
+        return this.repository.softDelete(code.toUpperCase());
     }
 }
 exports.PaymentMethodTypeRepository = PaymentMethodTypeRepository;

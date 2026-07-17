@@ -14,8 +14,10 @@ const typeorm_1 = require("typeorm");
 const uuid_1 = require("uuid");
 const enums_1 = require("../../shared/enums");
 let BillingAuditLogEntity = class BillingAuditLogEntity {
-    constructor() {
-        this.publicId = (0, uuid_1.v4)();
+    generatePublicId() {
+        if (!this.publicId) {
+            this.publicId = (0, uuid_1.v4)();
+        }
     }
 };
 exports.BillingAuditLogEntity = BillingAuditLogEntity;
@@ -24,69 +26,144 @@ __decorate([
     __metadata("design:type", Number)
 ], BillingAuditLogEntity.prototype, "id", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'public_id', type: 'uuid', unique: true }),
+    (0, typeorm_1.Column)({
+        name: 'public_id',
+        type: 'uuid',
+        unique: true,
+    }),
     __metadata("design:type", String)
 ], BillingAuditLogEntity.prototype, "publicId", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'company_id', type: 'int' }),
+    (0, typeorm_1.BeforeInsert)(),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], BillingAuditLogEntity.prototype, "generatePublicId", null);
+__decorate([
+    (0, typeorm_1.Column)({
+        name: 'company_id',
+        type: 'int',
+    }),
     __metadata("design:type", Number)
 ], BillingAuditLogEntity.prototype, "companyId", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'company_public_id', type: 'uuid', nullable: true }),
+    (0, typeorm_1.Column)({
+        name: 'company_public_id',
+        type: 'uuid',
+        nullable: true,
+    }),
     __metadata("design:type", Object)
 ], BillingAuditLogEntity.prototype, "companyPublicId", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'entity_type', type: 'enum', enum: enums_1.AuditEntityType }),
+    (0, typeorm_1.Column)({
+        name: 'entity_type',
+        type: 'enum',
+        enum: enums_1.AuditEntityType,
+    }),
     __metadata("design:type", String)
 ], BillingAuditLogEntity.prototype, "entityType", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'entity_id', type: 'int', nullable: true }),
+    (0, typeorm_1.Column)({
+        name: 'entity_id',
+        type: 'int',
+        nullable: true,
+    }),
     __metadata("design:type", Object)
 ], BillingAuditLogEntity.prototype, "entityId", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'entity_public_id', type: 'uuid', nullable: true }),
+    (0, typeorm_1.Column)({
+        name: 'entity_public_id',
+        type: 'uuid',
+        nullable: true,
+    }),
     __metadata("design:type", Object)
 ], BillingAuditLogEntity.prototype, "entityPublicId", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: 'enum', enum: enums_1.AuditAction }),
+    (0, typeorm_1.Column)({
+        type: 'enum',
+        enum: enums_1.AuditAction,
+    }),
     __metadata("design:type", String)
 ], BillingAuditLogEntity.prototype, "action", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'old_values', type: 'jsonb', nullable: true }),
+    (0, typeorm_1.Column)({
+        name: 'old_values',
+        type: 'jsonb',
+        nullable: true,
+    }),
     __metadata("design:type", Object)
 ], BillingAuditLogEntity.prototype, "oldValues", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'new_values', type: 'jsonb', nullable: true }),
+    (0, typeorm_1.Column)({
+        name: 'new_values',
+        type: 'jsonb',
+        nullable: true,
+    }),
     __metadata("design:type", Object)
 ], BillingAuditLogEntity.prototype, "newValues", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'performed_by', type: 'varchar', length: 100, nullable: true }),
+    (0, typeorm_1.Column)({
+        name: 'performed_by',
+        type: 'varchar',
+        length: 100,
+        nullable: true,
+    }),
     __metadata("design:type", Object)
 ], BillingAuditLogEntity.prototype, "performedBy", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'performed_by_email', type: 'varchar', length: 150, nullable: true }),
+    (0, typeorm_1.Column)({
+        name: 'performed_by_email',
+        type: 'varchar',
+        length: 254,
+        nullable: true,
+    }),
     __metadata("design:type", Object)
 ], BillingAuditLogEntity.prototype, "performedByEmail", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'performed_by_username', type: 'varchar', length: 150, nullable: true }),
+    (0, typeorm_1.Column)({
+        name: 'performed_by_username',
+        type: 'varchar',
+        length: 150,
+        nullable: true,
+    }),
     __metadata("design:type", Object)
 ], BillingAuditLogEntity.prototype, "performedByUsername", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'performed_by_role', type: 'varchar', length: 80, nullable: true }),
+    (0, typeorm_1.Column)({
+        name: 'performed_by_role',
+        type: 'varchar',
+        length: 80,
+        nullable: true,
+    }),
     __metadata("design:type", Object)
 ], BillingAuditLogEntity.prototype, "performedByRole", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'ip_address', type: 'varchar', length: 80, nullable: true }),
+    (0, typeorm_1.Column)({
+        name: 'ip_address',
+        type: 'varchar',
+        length: 45,
+        nullable: true,
+    }),
     __metadata("design:type", Object)
 ], BillingAuditLogEntity.prototype, "ipAddress", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'user_agent', type: 'text', nullable: true }),
+    (0, typeorm_1.Column)({
+        name: 'user_agent',
+        type: 'text',
+        nullable: true,
+    }),
     __metadata("design:type", Object)
 ], BillingAuditLogEntity.prototype, "userAgent", void 0);
 __decorate([
-    (0, typeorm_1.CreateDateColumn)({ name: 'created_at' }),
+    (0, typeorm_1.CreateDateColumn)({
+        name: 'created_at',
+        type: 'timestamptz',
+    }),
     __metadata("design:type", Date)
 ], BillingAuditLogEntity.prototype, "createdAt", void 0);
 exports.BillingAuditLogEntity = BillingAuditLogEntity = __decorate([
-    (0, typeorm_1.Entity)('billing_audit_logs')
+    (0, typeorm_1.Entity)('billing_audit_logs'),
+    (0, typeorm_1.Index)(['companyId', 'createdAt']),
+    (0, typeorm_1.Index)(['companyId', 'entityType', 'entityPublicId']),
+    (0, typeorm_1.Index)(['companyId', 'action'])
 ], BillingAuditLogEntity);

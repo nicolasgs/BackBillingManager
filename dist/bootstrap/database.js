@@ -15,12 +15,20 @@ const audit_log_entity_1 = require("../modules/audit-logs/audit-log.entity");
 exports.AppDataSource = new typeorm_1.DataSource({
     type: 'postgres',
     host: env_1.env.DB_HOST,
-    port: Number(env_1.env.DB_PORT),
+    port: env_1.env.DB_PORT,
     username: env_1.env.DB_USERNAME,
     password: env_1.env.DB_PASSWORD,
     database: env_1.env.DB_DATABASE,
-    synchronize: env_1.env.DB_SYNCHRONIZE === 'true',
-    logging: env_1.env.DB_LOGGING === 'true',
+    synchronize: env_1.env.DB_SYNCHRONIZE,
+    logging: env_1.env.DB_LOGGING,
+    ssl: env_1.env.DB_SSL
+        ? {
+            rejectUnauthorized: false,
+        }
+        : false,
+    extra: {
+        max: 10,
+    },
     entities: [
         billing_category_entity_1.BillingCategoryEntity,
         payment_method_type_entity_1.PaymentMethodTypeEntity,
@@ -29,6 +37,6 @@ exports.AppDataSource = new typeorm_1.DataSource({
         expense_entity_1.ExpenseEntity,
         monthly_closing_entity_1.MonthlyClosingEntity,
         monthly_closing_item_entity_1.MonthlyClosingItemEntity,
-        audit_log_entity_1.BillingAuditLogEntity
+        audit_log_entity_1.BillingAuditLogEntity,
     ],
 });

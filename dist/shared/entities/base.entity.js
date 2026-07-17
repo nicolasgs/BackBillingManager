@@ -13,8 +13,10 @@ exports.BaseEntity = void 0;
 const typeorm_1 = require("typeorm");
 const uuid_1 = require("uuid");
 class BaseEntity {
-    constructor() {
-        this.publicId = (0, uuid_1.v4)();
+    generatePublicId() {
+        if (!this.publicId) {
+            this.publicId = (0, uuid_1.v4)();
+        }
     }
 }
 exports.BaseEntity = BaseEntity;
@@ -23,22 +25,43 @@ __decorate([
     __metadata("design:type", Number)
 ], BaseEntity.prototype, "id", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'public_id', type: 'uuid', unique: true }),
+    (0, typeorm_1.Column)({
+        name: 'public_id',
+        type: 'uuid',
+        unique: true,
+    }),
     __metadata("design:type", String)
 ], BaseEntity.prototype, "publicId", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'created_by', type: 'uuid', nullable: true }),
+    (0, typeorm_1.Column)({
+        name: 'created_by',
+        type: 'uuid',
+        nullable: true,
+    }),
     __metadata("design:type", Object)
 ], BaseEntity.prototype, "createdBy", void 0);
 __decorate([
-    (0, typeorm_1.CreateDateColumn)({ name: 'created_at' }),
+    (0, typeorm_1.CreateDateColumn)({
+        name: 'created_at',
+    }),
     __metadata("design:type", Date)
 ], BaseEntity.prototype, "createdAt", void 0);
 __decorate([
-    (0, typeorm_1.UpdateDateColumn)({ name: 'updated_at' }),
+    (0, typeorm_1.UpdateDateColumn)({
+        name: 'updated_at',
+    }),
     __metadata("design:type", Date)
 ], BaseEntity.prototype, "updatedAt", void 0);
 __decorate([
-    (0, typeorm_1.DeleteDateColumn)({ name: 'deleted_at', nullable: true }),
+    (0, typeorm_1.DeleteDateColumn)({
+        name: 'deleted_at',
+        nullable: true,
+    }),
     __metadata("design:type", Object)
 ], BaseEntity.prototype, "deletedAt", void 0);
+__decorate([
+    (0, typeorm_1.BeforeInsert)(),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], BaseEntity.prototype, "generatePublicId", null);

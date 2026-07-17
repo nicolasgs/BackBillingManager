@@ -3,6 +3,8 @@ import { BaseEntity } from '../../shared/entities/base.entity'
 import { BillingCategoryType } from '../../shared/enums'
 
 @Entity('billing_categories')
+@Index(['companyId'])
+@Index(['companyPublicId'])
 @Index(['companyId', 'name', 'type'], { unique: true })
 export class BillingCategoryEntity extends BaseEntity {
     
