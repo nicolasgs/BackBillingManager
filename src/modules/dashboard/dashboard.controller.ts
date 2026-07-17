@@ -1,111 +1,181 @@
 import { NextFunction, Request, Response } from 'express'
 import { sendSuccess } from '../../shared/responses'
+import { DashboardFilters } from './interfaces/dashboard-filters.interface'
 import { DashboardService } from './dashboard.service'
 
 const service = new DashboardService()
 
 export class DashboardController {
-    summary = async (req: Request, res: Response, next: NextFunction) => {
-        try {
-        const summary = await service.getSummary(req.query as any)
+  private buildFilters(req: Request): DashboardFilters | null {
+    const companyId = req.user?.companyId
 
-        return sendSuccess({
-            res,
-            req,
-            code: 'DASHBOARD_SUMMARY_FOUND',
-            message: 'Dashboard summary retrieved successfully',
-            data: summary,
-        })
-        } catch (error) {
-        next(error)
-        }
+    if (!companyId) {
+      return null
     }
 
-    byCategory = async (req: Request, res: Response, next: NextFunction) => {
-        try {
-        const result = await service.getByCategory(req.query as any)
+    const queryFilters = req.query as unknown as Omit<
+      DashboardFilters,
+      'companyId' | 'companyPublicId'
+    >
 
-        return sendSuccess({
-            res,
-            req,
-            code: 'DASHBOARD_BY_CATEGORY_FOUND',
-            message: 'Dashboard category summary retrieved successfully',
-            data: result,
-        })
-        } catch (error) {
-        next(error)
-        }
+    return {
+      ...queryFilters,
+      companyId,
+      companyPublicId: req.user?.companyPublicId ?? null,
     }
+  }
 
-    monthlyTrend = async (req: Request, res: Response, next: NextFunction) => {
-        try {
-            const result = await service.getMonthlyTrend(req.query as any)
+  private sendMissingContext(req: Request, res: Response) {
+    return res.status(401).json({
+      success: false,
+      code: 'AUTH_CONTEXT_MISSING',
+      message: 'Company ID was not found in the authenticated user context',
+      path: req.originalUrl,
+      timestamp: new Date().toISOString(),
+    })
+  }
 
-            return sendSuccess({
-            res,
-            req,
-            code: 'DASHBOARD_MONTHLY_TREND_FOUND',
-            message: 'Dashboard monthly trend retrieved successfully',
-            data: result,
-            })
-        } catch (error) {
-            next(error)
-        }
+  summary = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const filters = this.buildFilters(req)
+
+      if (!filters) {
+        return this.sendMissingContext(req, res)
+      }
+
+      const summary = await service.getSummary(filters)
+
+      return sendSuccess({
+        res,
+        req,
+        code: 'DASHBOARD_SUMMARY_FOUND',
+        message: 'Dashboard summary retrieved successfully',
+        data: summary,
+      })
+    } catch (error) {
+      next(error)
     }
+  }
 
-    topVendors = async (req: Request, res: Response, next: NextFunction) => {
-        try {
-            const result = await service.getTopVendors(req.query as any)
+  byCategory = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const filters = this.buildFilters(req)
 
-            return sendSuccess({
-            res,
-            req,
-            code: 'DASHBOARD_TOP_VENDORS_FOUND',
-            message: 'Dashboard top vendors retrieved successfully',
-            data: result,
-            })
-        } catch (error) {
-            next(error)
-        }
+      if (!filters) {
+        return this.sendMissingContext(req, res)
+      }
+
+      const result = await service.getByCategory(filters)
+
+      return sendSuccess({
+        res,
+        req,
+        code: 'DASHBOARD_BY_CATEGORY_FOUND',
+        message: 'Dashboard category summary retrieved successfully',
+        data: result,
+      })
+    } catch (error) {
+      next(error)
     }
+  }
 
-    topIncomeCategories = async (
-        req: Request,
-        res: Response,
-        next: NextFunction
-        ) => {
-        try {
-            const result = await service.getTopIncomeCategories(req.query as any)
+  monthlyTrend = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    try {
+      const filters = this.buildFilters(req)
 
-            return sendSuccess({
-            res,
-            req,
-            code: 'DASHBOARD_TOP_INCOME_CATEGORIES_FOUND',
-            message: 'Dashboard top income categories retrieved successfully',
-            data: result,
-            })
-        } catch (error) {
-            next(error)
-        }
+      if (!filters) {
+        return this.sendMissingContext(req, res)
+      }
+
+      const result = await service.getMonthlyTrend(filters)
+
+      return sendSuccess({
+        res,
+        req,
+        code: 'DASHBOARD_MONTHLY_TREND_FOUND',
+        message: 'Dashboard monthly trend retrieved successfully',
+        data: result,
+      })
+    } catch (error) {
+      next(error)
     }
+  }
 
-    topExpenseCategories = async (
-        req: Request,
-        res: Response,
-        next: NextFunction
-        ) => {
-        try {
-            const result = await service.getTopExpenseCategories(req.query as any)
+  topVendors = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const filters = this.buildFilters(req)
 
-            return sendSuccess({
-            res,
-            req,
-            code: 'DASHBOARD_TOP_EXPENSE_CATEGORIES_FOUND',
-            message: 'Dashboard top expense categories retrieved successfully',
-            data: result,
-            })
-        } catch (error) {
-            next(error)
-        }
+      if (!filters) {
+        return this.sendMissingContext(req, res)
+      }
+
+      const result = await service.getTopVendors(filters)
+
+      return sendSuccess({
+        res,
+        req,
+        code: 'DASHBOARD_TOP_VENDORS_FOUND',
+        message: 'Dashboard top vendors retrieved successfully',
+        data: result,
+      })
+    } catch (error) {
+      next(error)
     }
+  }
+
+  topIncomeCategories = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    try {
+      const filters = this.buildFilters(req)
+
+      if (!filters) {
+        return this.sendMissingContext(req, res)
+      }
+
+      const result = await service.getTopIncomeCategories(filters)
+
+      return sendSuccess({
+        res,
+        req,
+        code: 'DASHBOARD_TOP_INCOME_CATEGORIES_FOUND',
+        message: 'Dashboard top income categories retrieved successfully',
+        data: result,
+      })
+    } catch (error) {
+      next(error)
+    }
+  }
+
+  topExpenseCategories = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) => {
+    try {
+      const filters = this.buildFilters(req)
+
+      if (!filters) {
+        return this.sendMissingContext(req, res)
+      }
+
+      const result = await service.getTopExpenseCategories(filters)
+
+      return sendSuccess({
+        res,
+        req,
+        code: 'DASHBOARD_TOP_EXPENSE_CATEGORIES_FOUND',
+        message: 'Dashboard top expense categories retrieved successfully',
+        data: result,
+      })
+    } catch (error) {
+      next(error)
+    }
+  }
 }

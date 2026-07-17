@@ -1,66 +1,90 @@
 import { ApiError } from '../../shared/errors'
-import { PaymentMethodTypeEntity } from './payment-method-type.entity'
-import { PaymentMethodTypeRepository } from './payment-method-type.repository'
 import {
-    CreatePaymentMethodTypeDto,
-    UpdatePaymentMethodTypeDto,
+  CreatePaymentMethodTypeDto,
+  UpdatePaymentMethodTypeDto,
 } from './dto/payment-method-type.dto'
+import { PaymentMethodTypeRepository } from './payment-method-type.repository'
 
 export class PaymentMethodTypeService {
-    constructor(
-        private readonly repository = new PaymentMethodTypeRepository()
-    ) {}
+  constructor(
+    private readonly repository = new PaymentMethodTypeRepository()
+  ) {}
 
-    async create(payload: CreatePaymentMethodTypeDto) {
-        const existing = await this.repository.findByCode(payload.code!)
+  async create(payload: CreatePaymentMethodTypeDto) {
+    const code = payload.code.trim().toUpperCase()
 
-        if (existing) {
-        throw new ApiError(
-            409,
-            'PAYMENT_METHOD_TYPE_ALREADY_EXISTS',
-            'Payment method type already exists'
-        )
-        }
+    const existing =
+      await this.repository.findByCodeIncludingDeleted(code)
 
-        const paymentMethodType = this.repository.createEntity(payload)
-
-        return this.repository.save(paymentMethodType)
+    if (existing && !existing.deletedAt) {
+      throw new ApiError(
+        409,
+        'PAYMENT_METHOD_TYPE_ALREADY_EXISTS',
+        'Payment method type already exists'
+      )
     }
 
-    async findAll() {
-        return this.repository.findAll()
+    if (existing?.deletedAt) {
+      await this.repository.restoreByCode(code)
+
+      existing.description = payload.description.trim()
+      existing.deletedAt = null
+
+      return this.repository.save(existing)
     }
 
-    async findByCode(code: string) {
-        const paymentMethodType = await this.repository.findByCode(code)
+    const paymentMethodType = this.repository.createEntity({
+      code,
+      description: payload.description.trim(),
+    })
 
-        if (!paymentMethodType) {
-        throw new ApiError(
-            404,
-            'PAYMENT_METHOD_TYPE_NOT_FOUND',
-            'Payment method type not found'
-        )
-        }
+    return this.repository.save(paymentMethodType)
+  }
 
-        return paymentMethodType
+  async findAll() {
+    return this.repository.findAll()
+  }
+
+  async findByCode(code: string) {
+    const normalizedCode = code.trim().toUpperCase()
+
+    const paymentMethodType =
+      await this.repository.findByCode(normalizedCode)
+
+    if (!paymentMethodType) {
+      throw new ApiError(
+        404,
+        'PAYMENT_METHOD_TYPE_NOT_FOUND',
+        'Payment method type not found'
+      )
     }
 
-    async update(code: string, payload: UpdatePaymentMethodTypeDto) {
-        const paymentMethodType = await this.findByCode(code)
+    return paymentMethodType
+  }
 
-        Object.assign(paymentMethodType, payload)
+  async update(
+    code: string,
+    payload: UpdatePaymentMethodTypeDto
+  ) {
+    const paymentMethodType = await this.findByCode(code)
 
-        return this.repository.save(paymentMethodType)
+    if (payload.description !== undefined) {
+      paymentMethodType.description = payload.description.trim()
     }
 
-    async softDelete(code: string) {
-        const paymentMethodType = await this.findByCode(code)
+    return this.repository.save(paymentMethodType)
+  }
 
-        await this.repository.softDeleteByCode(paymentMethodType.code)
+  async softDelete(code: string) {
+    const paymentMethodType = await this.findByCode(code)
 
-        return {
-        code: paymentMethodType.code,
-        deleted: true,
-        }
+    await this.repository.softDeleteByCode(
+      paymentMethodType.code
+    )
+
+    return {
+      code: paymentMethodType.code,
+      deleted: true,
     }
+  }
 }

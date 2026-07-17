@@ -1,0 +1,15 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const validation_middleware_1 = require("../../middlewares/validation.middleware");
+const expense_controller_1 = require("./expense.controller");
+const expense_schemas_1 = require("./expense.schemas");
+const inject_auth_context_middleware_1 = require("../../middlewares/inject-auth-context.middleware");
+const router = (0, express_1.Router)();
+const controller = new expense_controller_1.ExpenseController();
+router.post('/', inject_auth_context_middleware_1.injectAuthContextToBody, (0, validation_middleware_1.validate)(expense_schemas_1.createExpenseSchema), controller.create);
+router.get('/', (0, validation_middleware_1.validate)(expense_schemas_1.listExpensesQuerySchema, 'query'), controller.findAll);
+router.get('/:publicId', (0, validation_middleware_1.validate)(expense_schemas_1.expenseParamsSchema, 'params'), controller.findOne);
+router.patch('/:publicId', (0, validation_middleware_1.validate)(expense_schemas_1.expenseParamsSchema, 'params'), (0, validation_middleware_1.validate)(expense_schemas_1.updateExpenseSchema), controller.update);
+router.delete('/:publicId', (0, validation_middleware_1.validate)(expense_schemas_1.expenseParamsSchema, 'params'), controller.remove);
+exports.default = router;

@@ -1,4 +1,4 @@
-import { ReportDateRangeQueryDto } from './dto/report.dto'
+import { ReportFilters } from './interfaces/report-filters.interface'
 import { ReportsRepository } from './reports.repository'
 
 export class ReportsService {
@@ -6,15 +6,28 @@ export class ReportsService {
     private readonly repository = new ReportsRepository()
   ) {}
 
-  async getProfitLoss(filters: ReportDateRangeQueryDto) {
-    const incomes = await this.repository.findPaidIncomes(filters)
-    const expenses = await this.repository.findPaidExpenses(filters)
+  async getProfitLoss(filters: ReportFilters) {
+    const [
+      incomes,
+      expenses,
+      incomeByCategory,
+      expenseByCategory,
+    ] = await Promise.all([
+      this.repository.findPaidIncomes(filters),
+      this.repository.findPaidExpenses(filters),
+      this.repository.getIncomeByCategory(filters),
+      this.repository.getExpenseByCategory(filters),
+    ])
 
-    const incomeByCategory = await this.repository.getIncomeByCategory(filters)
-    const expenseByCategory = await this.repository.getExpenseByCategory(filters)
+    const totalIncome = incomes.reduce(
+      (sum, item) => sum + Number(item.amount),
+      0
+    )
 
-    const totalIncome = incomes.reduce((sum, item) => sum + Number(item.amount), 0)
-    const totalExpense = expenses.reduce((sum, item) => sum + Number(item.amount), 0)
+    const totalExpense = expenses.reduce(
+      (sum, item) => sum + Number(item.amount),
+      0
+    )
 
     return {
       companyId: filters.companyId,
@@ -23,29 +36,31 @@ export class ReportsService {
 
       totalIncome: Number(totalIncome.toFixed(2)),
       totalExpense: Number(totalExpense.toFixed(2)),
-      netProfit: Number((totalIncome - totalExpense).toFixed(2)),
+      netProfit: Number(
+        (totalIncome - totalExpense).toFixed(2)
+      ),
 
       incomeCount: incomes.length,
       expenseCount: expenses.length,
 
       incomeByCategory: incomeByCategory.map((item) => ({
-        categoryName: item.categoryName,
+        categoryName: item.categoryName ?? 'Uncategorized',
         total: Number(item.total || 0),
         count: Number(item.count || 0),
       })),
 
       expenseByCategory: expenseByCategory.map((item) => ({
-        categoryName: item.categoryName,
+        categoryName: item.categoryName ?? 'Uncategorized',
         total: Number(item.total || 0),
         count: Number(item.count || 0),
       })),
     }
   }
 
-  async exportIncomesCsv(filters: ReportDateRangeQueryDto) {
+  async exportIncomesCsv(filters: ReportFilters) {
     const incomes = await this.repository.findPaidIncomes(filters)
 
-    const rows = [
+    const rows: unknown[][] = [
       [
         'Date',
         'Category',
@@ -73,10 +88,10 @@ export class ReportsService {
     return this.toCsv(rows)
   }
 
-  async exportExpensesCsv(filters: ReportDateRangeQueryDto) {
+  async exportExpensesCsv(filters: ReportFilters) {
     const expenses = await this.repository.findPaidExpenses(filters)
 
-    const rows = [
+    const rows: unknown[][] = [
       [
         'Date',
         'Vendor',
@@ -106,13 +121,14 @@ export class ReportsService {
     return this.toCsv(rows)
   }
 
-  private toCsv(rows: any[][]) {
+  private toCsv(rows: unknown[][]) {
     return rows
       .map((row) =>
         row
           .map((value) => {
             const stringValue = String(value ?? '')
             const escaped = stringValue.replace(/"/g, '""')
+
             return `"${escaped}"`
           })
           .join(',')

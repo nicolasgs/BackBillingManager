@@ -1,0 +1,15 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const inject_auth_context_middleware_1 = require("../../middlewares/inject-auth-context.middleware");
+const validation_middleware_1 = require("../../middlewares/validation.middleware");
+const monthly_closing_controller_1 = require("./monthly-closing.controller");
+const monthly_closing_schemas_1 = require("./monthly-closing.schemas");
+const router = (0, express_1.Router)();
+const controller = new monthly_closing_controller_1.MonthlyClosingController();
+router.post('/', inject_auth_context_middleware_1.injectAuthContextToBody, (0, validation_middleware_1.validate)(monthly_closing_schemas_1.createMonthlyClosingSchema), controller.create);
+router.get('/', (0, validation_middleware_1.validate)(monthly_closing_schemas_1.listMonthlyClosingsQuerySchema, 'query'), controller.findAll);
+router.get('/:publicId', (0, validation_middleware_1.validate)(monthly_closing_schemas_1.monthlyClosingParamsSchema, 'params'), controller.findOne);
+router.post('/:publicId/close', (0, validation_middleware_1.validate)(monthly_closing_schemas_1.monthlyClosingParamsSchema, 'params'), (0, validation_middleware_1.validate)(monthly_closing_schemas_1.closeMonthlyClosingSchema), controller.close);
+router.post('/:publicId/reopen', (0, validation_middleware_1.validate)(monthly_closing_schemas_1.monthlyClosingParamsSchema, 'params'), (0, validation_middleware_1.validate)(monthly_closing_schemas_1.reopenMonthlyClosingSchema), controller.reopen);
+exports.default = router;

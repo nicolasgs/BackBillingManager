@@ -92,7 +92,7 @@ export async function authMiddleware(
     const groups = accessPayload['cognito:groups']
     const roles = Array.isArray(groups) ? groups.map(String) : []
 
-    console.log('ID TOKEN PAYLOAD:', JSON.stringify(idPayload, null, 2))
+    
     req.user = {
       id: String(idPayload.sub),
       email: idPayload.email ? String(idPayload.email) : undefined,
@@ -111,7 +111,6 @@ export async function authMiddleware(
         : undefined,
     }
 
-    console.log('REQ USER:', req.user)
 
     next()
   } catch (error) {

@@ -13,12 +13,21 @@ import { BillingAuditLogEntity } from '../modules/audit-logs/audit-log.entity'
 export const AppDataSource = new DataSource({
   type: 'postgres',
   host: env.DB_HOST,
-  port: Number(env.DB_PORT),
+  port: env.DB_PORT,
   username: env.DB_USERNAME,
   password: env.DB_PASSWORD,
   database: env.DB_DATABASE,
-  synchronize: env.DB_SYNCHRONIZE === 'true',
-  logging: env.DB_LOGGING === 'true',
+  synchronize: env.DB_SYNCHRONIZE,
+  logging: env.DB_LOGGING,
+  ssl:
+    env.NODE_ENV === 'production'
+      ? {
+          rejectUnauthorized: false,
+        }
+      : false,
+  extra: {
+      max: 10,
+      },
   entities: [
     BillingCategoryEntity,
     PaymentMethodTypeEntity,
