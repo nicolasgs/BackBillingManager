@@ -55,3 +55,51 @@ export const listIncomesQuerySchema = z.object({
     fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 })
+
+export const createCrmPaymentIncomeSchema =
+    z.object({
+        paymentId:
+            z.coerce
+                .number()
+                .int()
+                .positive(),
+
+        clientId:
+            z.coerce
+                .number()
+                .int()
+                .positive(),
+
+        caseId:
+            z.coerce
+                .number()
+                .int()
+                .positive(),
+
+        amount:
+            z.coerce
+                .number()
+                .positive(),
+
+        paymentDate:
+            z.string()
+                .regex(
+                    /^\d{4}-\d{2}-\d{2}$/,
+                ),
+
+        paymentMethodCode:
+            z.string()
+                .min(2)
+                .max(20)
+                .toUpperCase(),
+
+        referenceNumber:
+            z.string()
+                .max(100)
+                .optional(),
+
+        notes:
+            z.string()
+                .max(1000)
+                .optional(),
+    })

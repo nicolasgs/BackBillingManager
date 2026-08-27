@@ -9,6 +9,7 @@ import { ExpenseEntity } from '../modules/expenses/expense.entity'
 import { MonthlyClosingEntity } from '../modules/monthly-closings/monthly-closing.entity'
 import { MonthlyClosingItemEntity } from '../modules/monthly-closings/monthly-closing-item.entity'
 import { BillingAuditLogEntity } from '../modules/audit-logs/audit-log.entity'
+import { BillingSettingsEntity } from  '../modules/billing-settings/billing-settings.entity'
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -40,5 +41,6 @@ export const AppDataSource = new DataSource({
     MonthlyClosingEntity,
     MonthlyClosingItemEntity,
     BillingAuditLogEntity,
+    BillingSettingsEntity,
   ],
 })

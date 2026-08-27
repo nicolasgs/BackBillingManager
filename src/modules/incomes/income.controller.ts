@@ -33,6 +33,71 @@ export class IncomeController {
     }
   }
 
+  createFromCrmPayment = async (
+      req: Request,
+      res: Response,
+      next: NextFunction,
+  ) => {
+      try {
+          const companyId =
+              req.user?.companyId
+
+          if (!companyId) {
+              return res
+                  .status(401)
+                  .json({
+                      success: false,
+                      code:
+                          'AUTH_CONTEXT_MISSING',
+                      message:
+                          'Company ID was not found in the authenticated user context',
+                      path:
+                          req.originalUrl,
+                      timestamp:
+                          new Date()
+                              .toISOString(),
+                  })
+          }
+
+          const authContext =
+              buildAuthContext(req)
+
+          const income =
+              await service
+                  .createFromCrmPayment(
+                      {
+                          ...req.body,
+
+                          companyId,
+
+                          companyPublicId:
+                              req.user
+                                  ?.companyPublicId ??
+                              null,
+
+                          createdBy:
+                              req.user?.id,
+                      },
+
+                      authContext,
+                  )
+
+          return sendSuccess({
+              res,
+              req,
+              statusCode: 201,
+              code:
+                  'CRM_PAYMENT_INCOME_RECORDED',
+              message:
+                  'CRM payment income recorded successfully',
+              data:
+                  income,
+          })
+      } catch (error) {
+          next(error)
+      }
+  }
+
   findAll = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const companyId = req.user?.companyId

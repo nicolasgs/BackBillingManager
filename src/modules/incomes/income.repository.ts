@@ -91,6 +91,30 @@ export class IncomeRepository {
         })
     }
 
+    findByExternalReference(params: {
+        companyId: number
+        externalProvider: string
+        externalTransactionId: string
+    }) {
+        return this.repository.findOne({
+            where: {
+                companyId:
+                    params.companyId,
+
+                externalProvider:
+                    params.externalProvider,
+
+                externalTransactionId:
+                    params.externalTransactionId,
+            },
+
+            relations: {
+                category: true,
+                paymentMethod: true,
+            },
+        })
+    }
+
     softDeleteById(id: number) {
         return this.repository.softDelete(id)
     }

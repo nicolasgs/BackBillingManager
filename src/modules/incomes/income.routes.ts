@@ -1,35 +1,76 @@
-import { Router } from 'express'
-import { validate } from '../../middlewares/validation.middleware'
-import { IncomeController } from './income.controller'
+import { Router } from "express";
+
+import { validate } from "../../middlewares/validation.middleware";
+
+import { injectAuthContextToBody } from "../../middlewares/inject-auth-context.middleware";
+
+import { IncomeController } from "./income.controller";
+
 import {
-    createIncomeSchema,
-    incomeParamsSchema,
-    listIncomesQuerySchema,
-    updateIncomeSchema,
-} from './income.schemas'
-import { injectAuthContextToBody } from '../../middlewares/inject-auth-context.middleware'
+  createCrmPaymentIncomeSchema,
+  createIncomeSchema,
+  incomeParamsSchema,
+  listIncomesQuerySchema,
+  updateIncomeSchema,
+} from "./income.schemas";
 
-const router = Router()
-const controller = new IncomeController()
+const router = Router();
 
-    router.post(
-        '/',
-        injectAuthContextToBody,
-        validate(createIncomeSchema),
-        controller.create
-    )
+const controller = new IncomeController();
 
-    router.get('/', validate(listIncomesQuerySchema, 'query'), controller.findAll)
+/*
+ * Create manual Income
+ */
+router.post(
+  "/",
+  injectAuthContextToBody,
+  validate(createIncomeSchema),
+  controller.create,
+);
 
-    router.get('/:publicId', validate(incomeParamsSchema, 'params'), controller.findOne)
+/*
+ * CRM Payment -> Income
+ *
+ * IMPORTANT:
+ * Keep static routes before /:publicId.
+ */
+router.post(
+  "/crm-payment",
+  validate(createCrmPaymentIncomeSchema),
+  controller.createFromCrmPayment,
+);
 
-    router.patch(
-        '/:publicId',
-        validate(incomeParamsSchema, 'params'),
-        validate(updateIncomeSchema),
-        controller.update
-    )
+/*
+ * List
+ */
+router.get("/", validate(listIncomesQuerySchema, "query"), controller.findAll);
 
-    router.delete('/:publicId', validate(incomeParamsSchema, 'params'), controller.remove)
+/*
+ * Detail
+ */
+router.get(
+  "/:publicId",
+  validate(incomeParamsSchema, "params"),
+  controller.findOne,
+);
 
-export default router
+/*
+ * Update
+ */
+router.patch(
+  "/:publicId",
+  validate(incomeParamsSchema, "params"),
+  validate(updateIncomeSchema),
+  controller.update,
+);
+
+/*
+ * Delete
+ */
+router.delete(
+  "/:publicId",
+  validate(incomeParamsSchema, "params"),
+  controller.remove,
+);
+
+export default router;

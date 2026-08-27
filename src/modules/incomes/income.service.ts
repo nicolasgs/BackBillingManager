@@ -17,14 +17,27 @@ import {
 } from '../../shared/enums'
 import { AuthContext } from '../audit-logs/interfaces/auth-context.interface'
 import { IncomeFilters } from './interfaces/income-filters.interface'
+import {
+    TransactionSource,
+    TransactionStatus,
+} from '../../shared/enums'
+
+import {
+    BillingSettingsService,
+} from '../billing-settings/billing-settings.service'
+
+import {
+    CreateCrmPaymentIncomeDto,
+} from './dto/income.dto'
 
 export class IncomeService {
     constructor(
-        private readonly incomeRepository = new IncomeRepository(),
-        private readonly categoryRepository = new BillingCategoryRepository(),
-        private readonly paymentMethodRepository = new PaymentMethodTypeRepository(),
-        private readonly periodLockService = new PeriodLockService(),
-        private readonly auditLogService = new AuditLogService()
+    private readonly incomeRepository = new IncomeRepository(),
+    private readonly categoryRepository = new BillingCategoryRepository(),
+    private readonly paymentMethodRepository = new PaymentMethodTypeRepository(),
+    private readonly periodLockService = new PeriodLockService(),
+    private readonly auditLogService = new AuditLogService(),
+    private readonly billingSettingsService = new BillingSettingsService(),
     ) {}
 
     async create(payload: CreateIncomeDto, authContext?: AuthContext) {
@@ -82,6 +95,135 @@ export class IncomeService {
         })
 
         return income
+    }
+
+    async createFromCrmPayment(
+        payload:
+            CreateCrmPaymentIncomeDto & {
+                companyId: number
+                companyPublicId?: string | null
+                createdBy?: string
+            },
+
+        authContext?: AuthContext,
+    ) {
+        const externalProvider =
+            'MINDPRO_CRM'
+
+        const externalTransactionId =
+            `PAYMENT:${payload.paymentId}`
+
+        /*
+        * Idempotency check.
+        *
+        * A retry from CRM must not create
+        * another Income for the same Payment.
+        */
+        const existing =
+            await this.incomeRepository
+                .findByExternalReference({
+                    companyId:
+                        payload.companyId,
+
+                    externalProvider,
+
+                    externalTransactionId,
+                })
+
+        if (existing) {
+            return existing
+        }
+
+        /*
+        * Resolve the configured Income
+        * category for CRM payments.
+        */
+        const settings =
+            await this.billingSettingsService
+                .findByCompany(
+                    payload.companyId,
+                )
+
+        if (!settings) {
+            throw new ApiError(
+                400,
+                'BILLING_SETTINGS_NOT_CONFIGURED',
+                'Billing settings have not been configured for this company.',
+            )
+        }
+
+        const categoryId =
+            settings
+                .crmPaymentIncomeCategoryId
+
+        if (!categoryId) {
+            throw new ApiError(
+                400,
+                'CRM_PAYMENT_INCOME_CATEGORY_NOT_CONFIGURED',
+                'The default income category for CRM payments has not been configured.',
+            )
+        }
+
+        /*
+        * Delegate the actual accounting
+        * validation and persistence to the
+        * normal Income creation workflow.
+        */
+        return this.create(
+            {
+                companyId:
+                    payload.companyId,
+
+                companyPublicId:
+                    payload
+                        .companyPublicId ??
+                    null,
+
+                createdBy:
+                    payload.createdBy,
+
+                clientId:
+                    payload.clientId,
+
+                caseId:
+                    payload.caseId,
+
+                amount:
+                    payload.amount,
+
+                currency:
+                    'USD',
+
+                incomeDate:
+                    payload.paymentDate,
+
+                categoryId,
+
+                paymentMethodCode:
+                    payload
+                        .paymentMethodCode,
+
+                description:
+                    payload.notes
+                        ? `CRM payment #${payload.paymentId}: ${payload.notes}`
+                        : `CRM payment #${payload.paymentId}`,
+
+                referenceNumber:
+                    payload.referenceNumber,
+
+                status:
+                    TransactionStatus.PAID,
+
+                source:
+                    TransactionSource.OTHER,
+
+                externalProvider,
+
+                externalTransactionId,
+            },
+
+            authContext,
+        )
     }
 
     async findAll(filters: IncomeFilters) {

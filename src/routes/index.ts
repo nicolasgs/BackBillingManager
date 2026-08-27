@@ -5,10 +5,11 @@ import paymentMethodTypeRoutes from '../modules/payment-method-type/payment-meth
 import incomeRoutes from '../modules/incomes/income.routes'
 import vendorRoutes from '../modules/vendors/vendor.routes'
 import expenseRoutes from '../modules/expenses/expense.routes'
-import dashboardRoutes from '../modules/dashboard/dashboard.routes'
+import dashboardRoutes from '../modules/financial-dashboard/dashboard.routes'
 import monthlyClosingRoutes from '../modules/monthly-closings/monthly-closing.routes'
 import auditLogRoutes from '../modules/audit-logs/audit-log.routes'
 import reportsRoutes from '../modules/report/reports.routes'
+import billingSettingsRoutes from '../modules/billing-settings/billing-settings.routes'
 
 import { authMiddleware } from '../middlewares/auth.middleware'
 
@@ -27,6 +28,7 @@ router.use('/audit-logs', authMiddleware, auditLogRoutes)
 router.use('/monthly-closings', authMiddleware, monthlyClosingRoutes)
 router.use('/billing-categories', authMiddleware, billingCategoryRoutes)
 router.use('/payment-method-type', authMiddleware, paymentMethodTypeRoutes)
+router.use('/billing-settings', authMiddleware, billingSettingsRoutes)
 
 
 
