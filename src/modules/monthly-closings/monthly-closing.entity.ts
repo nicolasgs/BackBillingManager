@@ -1,103 +1,102 @@
-import {
-  Check,
-  Column,
-  Entity,
-  Index,
-  OneToMany,
-} from 'typeorm'
-import { BaseEntity } from '../../shared/entities/base.entity'
-import { numericTransformer } from '../../shared/database/numeric.transformer'
-import { ClosingStatus } from '../../shared/enums'
-import { MonthlyClosingItemEntity } from './monthly-closing-item.entity'
+import { Check, Column, Entity, Index, OneToMany } from "typeorm";
+import { BaseEntity } from "../../shared/entities/base.entity";
+import { numericTransformer } from "../../shared/database/numeric.transformer";
+import { MonthlyClosingItemEntity } from "./monthly-closing-item.entity";
+import { ClosingStatus, ClosingType } from "../../shared/enums";
 
-@Entity('monthly_closings')
-@Index(['companyId', 'year', 'month'], { unique: true })
+@Entity("monthly_closings")
+@Index(["companyId", "year", "month"], { unique: true })
 @Check(`"month" BETWEEN 1 AND 12`)
 @Check(`"year" BETWEEN 2000 AND 2100`)
 export class MonthlyClosingEntity extends BaseEntity {
   @Column({
-    name: 'company_id',
-    type: 'int',
+    name: "company_id",
+    type: "int",
   })
-  companyId!: number
+  companyId!: number;
 
   @Column({
-    name: 'company_public_id',
-    type: 'uuid',
+    name: "company_public_id",
+    type: "uuid",
     nullable: true,
   })
-  companyPublicId?: string | null
+  companyPublicId?: string | null;
 
   @Column({
-    type: 'int',
+    type: "int",
   })
-  year!: number
+  year!: number;
 
   @Column({
-    type: 'int',
+    type: "int",
   })
-  month!: number
+  month!: number;
 
   @Column({
-    name: 'total_income',
-    type: 'numeric',
+    name: "total_income",
+    type: "numeric",
     precision: 12,
     scale: 2,
     default: 0,
     transformer: numericTransformer,
   })
-  totalIncome!: number
+  totalIncome!: number;
 
   @Column({
-    name: 'total_expense',
-    type: 'numeric',
+    name: "total_expense",
+    type: "numeric",
     precision: 12,
     scale: 2,
     default: 0,
     transformer: numericTransformer,
   })
-  totalExpense!: number
+  totalExpense!: number;
 
   @Column({
-    name: 'net_amount',
-    type: 'numeric',
+    name: "net_amount",
+    type: "numeric",
     precision: 12,
     scale: 2,
     default: 0,
     transformer: numericTransformer,
   })
-  netAmount!: number
+  netAmount!: number;
 
   @Column({
-    type: 'enum',
+    type: "enum",
     enum: ClosingStatus,
     default: ClosingStatus.DRAFT,
   })
-  status!: ClosingStatus
+  status!: ClosingStatus;
 
   @Column({
-    type: 'text',
+    type: "text",
     nullable: true,
   })
-  notes?: string | null
+  notes?: string | null;
 
   @Column({
-    name: 'closed_by',
-    type: 'uuid',
+    name: "closing_type",
+    type: "enum",
+    enum: ClosingType,
     nullable: true,
   })
-  closedBy?: string | null
+  closingType?: ClosingType | null;
 
   @Column({
-    name: 'closed_at',
-    type: 'timestamptz',
+    name: "closed_by",
+    type: "uuid",
     nullable: true,
   })
-  closedAt?: Date | null
+  closedBy?: string | null;
 
-  @OneToMany(
-    () => MonthlyClosingItemEntity,
-    (item) => item.monthlyClosing
-  )
-  items!: MonthlyClosingItemEntity[]
+  @Column({
+    name: "closed_at",
+    type: "timestamptz",
+    nullable: true,
+  })
+  closedAt?: Date | null;
+
+  @OneToMany(() => MonthlyClosingItemEntity, (item) => item.monthlyClosing)
+  items!: MonthlyClosingItemEntity[];
 }

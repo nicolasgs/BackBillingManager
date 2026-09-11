@@ -27,6 +27,10 @@ export class MonthlyClosingRepository {
     return this.closingRepository.save(closing);
   }
 
+  updateById(id: number, payload: Partial<MonthlyClosingEntity>) {
+    return this.closingRepository.update({ id }, payload);
+  }
+
   findExistingPeriod(companyId: number, year: number, month: number) {
     return this.closingRepository.findOne({
       where: { companyId, year, month, deletedAt: IsNull() },

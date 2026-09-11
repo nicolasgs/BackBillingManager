@@ -8,6 +8,7 @@ import { ApiError } from "../../shared/errors";
 import { AuditLogService } from "../audit-logs/audit-log.service";
 import { AuthContext } from "../audit-logs/interfaces/auth-context.interface";
 import {
+  CloseMonthlyClosingDto,
   CreateMonthlyClosingDto,
   ReopenMonthlyClosingDto,
 } from "./dto/monthly-closing.dto";
@@ -79,6 +80,7 @@ export class MonthlyClosingService {
 
   async close(
     publicId: string,
+    payload: CloseMonthlyClosingDto,
     companyId: number,
     closedBy: string,
     authContext?: AuthContext,
@@ -159,14 +161,19 @@ export class MonthlyClosingService {
       await this.repository.saveItems(items);
     }
 
-    closing.totalIncome = Number(totalIncome.toFixed(2));
-    closing.totalExpense = Number(totalExpense.toFixed(2));
-    closing.netAmount = Number(netAmount.toFixed(2));
-    closing.status = ClosingStatus.CLOSED;
-    closing.closedBy = closedBy;
-    closing.closedAt = new Date();
+    const closedAt = new Date();
 
-    const result = await this.repository.save(closing);
+    await this.repository.updateById(closing.id, {
+      totalIncome: Number(totalIncome.toFixed(2)),
+      totalExpense: Number(totalExpense.toFixed(2)),
+      netAmount: Number(netAmount.toFixed(2)),
+      closingType: payload.closingType,
+      status: ClosingStatus.CLOSED,
+      closedBy,
+      closedAt,
+    });
+
+    const result = await this.findByPublicId(publicId, companyId);
 
     await this.auditLogService.log({
       companyId: result.companyId,
@@ -180,6 +187,7 @@ export class MonthlyClosingService {
       },
       newValues: {
         status: result.status,
+        closingType: result.closingType,
         totalIncome: result.totalIncome,
         totalExpense: result.totalExpense,
         netAmount: result.netAmount,
@@ -215,12 +223,18 @@ export class MonthlyClosingService {
       notes: closing.notes,
     };
 
-    closing.status = ClosingStatus.REOPENED;
-    closing.notes = payload.notes ?? closing.notes;
-    closing.closedBy = null;
-    closing.closedAt = null;
+    const notes = payload.notes ?? closing.notes;
 
-    const result = await this.repository.save(closing);
+    await this.repository.updateById(closing.id, {
+      status: ClosingStatus.REOPENED,
+
+      notes,
+
+      closedBy: null,
+      closedAt: null,
+    });
+
+    const result = await this.findByPublicId(publicId, companyId);
 
     await this.auditLogService.log({
       companyId: result.companyId,
