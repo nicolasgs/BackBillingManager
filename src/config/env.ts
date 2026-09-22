@@ -29,3 +29,7 @@ export const env = {
   SWAGGER_ENABLED:
     process.env.SWAGGER_ENABLED !== 'false',
 }
+
+if (env.NODE_ENV === 'production' && env.DB_SYNCHRONIZE) {
+  throw new Error('DB_SYNCHRONIZE cannot be true in production')
+}
