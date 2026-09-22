@@ -1,323 +1,286 @@
-import { ApiError } from '../../shared/errors'
-import { BillingCategoryType } from '../../shared/enums'
-import { BillingCategoryRepository } from '../billing-categories/billing-category.repository'
-import { PaymentMethodTypeRepository } from '../payment-method-type/payment-method-type.repository'
-import { IncomeEntity } from './income.entity'
-import { IncomeRepository } from './income.repository'
+import { ApiError } from "../../shared/errors";
+import { BillingCategoryType } from "../../shared/enums";
+import { BillingCategoryRepository } from "../billing-categories/billing-category.repository";
+import { PaymentMethodTypeRepository } from "../payment-method-type/payment-method-type.repository";
+import { IncomeEntity } from "./income.entity";
+import { IncomeRepository } from "./income.repository";
 import {
-    CreateIncomeDto,
-    ListIncomesQueryDto,
-    UpdateIncomeDto,
-} from './dto/income.dto'
-import { PeriodLockService } from '../monthly-closings/services/period-lock.service'
-import { AuditLogService } from '../audit-logs/audit-log.service'
-import {
-  AuditAction,
-  AuditEntityType
-} from '../../shared/enums'
-import { AuthContext } from '../audit-logs/interfaces/auth-context.interface'
-import { IncomeFilters } from './interfaces/income-filters.interface'
-import {
-    TransactionSource,
-    TransactionStatus,
-} from '../../shared/enums'
+  CreateIncomeDto,
+  ListIncomesQueryDto,
+  UpdateIncomeDto,
+} from "./dto/income.dto";
+import { PeriodLockService } from "../monthly-closings/services/period-lock.service";
+import { AuditLogService } from "../audit-logs/audit-log.service";
+import { AuditAction, AuditEntityType } from "../../shared/enums";
+import { AuthContext } from "../audit-logs/interfaces/auth-context.interface";
+import { IncomeFilters } from "./interfaces/income-filters.interface";
+import { TransactionSource, TransactionStatus } from "../../shared/enums";
 
-import {
-    BillingSettingsService,
-} from '../billing-settings/billing-settings.service'
+import { BillingSettingsService } from "../billing-settings/billing-settings.service";
 
-import {
-    CreateCrmPaymentIncomeDto,
-} from './dto/income.dto'
+import { CreateCrmPaymentIncomeDto } from "./dto/income.dto";
 
 export class IncomeService {
-    constructor(
+  constructor(
     private readonly incomeRepository = new IncomeRepository(),
     private readonly categoryRepository = new BillingCategoryRepository(),
     private readonly paymentMethodRepository = new PaymentMethodTypeRepository(),
     private readonly periodLockService = new PeriodLockService(),
     private readonly auditLogService = new AuditLogService(),
     private readonly billingSettingsService = new BillingSettingsService(),
-    ) {}
+  ) {}
 
-    async create(payload: CreateIncomeDto, authContext?: AuthContext) {
-        const category = await this.categoryRepository.findByIdAndCompanyAndType({
-            id: payload.categoryId,
-            companyId: payload.companyId,
-            type: BillingCategoryType.INCOME,
-        })
+  async create(payload: CreateIncomeDto, authContext?: AuthContext) {
+    const category = await this.categoryRepository.findByIdAndCompanyAndType({
+      id: payload.categoryId,
+      companyId: payload.companyId,
+      type: BillingCategoryType.INCOME,
+    });
 
-        await this.periodLockService.validateOpenPeriod(
-            payload.companyId,
-            payload.incomeDate
-        )
+    await this.periodLockService.validateOpenPeriod(
+      payload.companyId,
+      payload.incomeDate,
+    );
 
-        if (!category) {
-            throw new ApiError(
-            400,
-            'INVALID_INCOME_CATEGORY',
-            'Invalid income category'
-            )
-        }
-
-        const paymentMethod = await this.paymentMethodRepository.findByCode(
-            payload.paymentMethodCode
-        )
-
-        if (!paymentMethod) {
-            throw new ApiError(
-            400,
-            'INVALID_PAYMENT_METHOD',
-            'Invalid payment method'
-            )
-        }
-
-        const incomeEntity = this.incomeRepository.createEntity({
-            ...payload,
-            amount: Number(Number(payload.amount).toFixed(2)),
-        })
-
-        const income = await this.incomeRepository.save(incomeEntity)
-
-        await this.auditLogService.log({
-            companyId: income.companyId,
-            companyPublicId: income.companyPublicId,
-
-            entityType: AuditEntityType.INCOME,
-            entityId: income.id,
-            entityPublicId: income.publicId,
-
-            action: AuditAction.CREATE,
-
-            newValues: income,
-
-            authContext,
-        })
-
-        return income
+    if (!category) {
+      throw new ApiError(
+        400,
+        "INVALID_INCOME_CATEGORY",
+        "Invalid income category",
+      );
     }
 
-    async createFromCrmPayment(
-        payload:
-            CreateCrmPaymentIncomeDto & {
-                companyId: number
-                companyPublicId?: string | null
-                createdBy?: string
-            },
+    const paymentMethod = await this.paymentMethodRepository.findByCode(
+      payload.paymentMethodCode,
+    );
 
-        authContext?: AuthContext,
-    ) {
-        const externalProvider =
-            'MINDPRO_CRM'
-
-        const externalTransactionId =
-            `PAYMENT:${payload.paymentId}`
-
-        /*
-        * Idempotency check.
-        *
-        * A retry from CRM must not create
-        * another Income for the same Payment.
-        */
-        const existing =
-            await this.incomeRepository
-                .findByExternalReference({
-                    companyId:
-                        payload.companyId,
-
-                    externalProvider,
-
-                    externalTransactionId,
-                })
-
-        if (existing) {
-            return existing
-        }
-
-        /*
-        * Resolve the configured Income
-        * category for CRM payments.
-        */
-        const settings =
-            await this.billingSettingsService
-                .findByCompany(
-                    payload.companyId,
-                )
-
-        if (!settings) {
-            throw new ApiError(
-                400,
-                'BILLING_SETTINGS_NOT_CONFIGURED',
-                'Billing settings have not been configured for this company.',
-            )
-        }
-
-        const categoryId =
-            settings
-                .crmPaymentIncomeCategoryId
-
-        if (!categoryId) {
-            throw new ApiError(
-                400,
-                'CRM_PAYMENT_INCOME_CATEGORY_NOT_CONFIGURED',
-                'The default income category for CRM payments has not been configured.',
-            )
-        }
-
-        /*
-        * Delegate the actual accounting
-        * validation and persistence to the
-        * normal Income creation workflow.
-        */
-        return this.create(
-            {
-                companyId:
-                    payload.companyId,
-
-                companyPublicId:
-                    payload
-                        .companyPublicId ??
-                    null,
-
-                createdBy:
-                    payload.createdBy,
-
-                clientId:
-                    payload.clientId,
-
-                caseId:
-                    payload.caseId,
-
-                amount:
-                    payload.amount,
-
-                currency:
-                    'USD',
-
-                incomeDate:
-                    payload.paymentDate,
-
-                categoryId,
-
-                paymentMethodCode:
-                    payload
-                        .paymentMethodCode,
-
-                description:
-                    payload.notes
-                        ? `CRM payment #${payload.paymentId}: ${payload.notes}`
-                        : `CRM payment #${payload.paymentId}`,
-
-                referenceNumber:
-                    payload.referenceNumber,
-
-                status:
-                    TransactionStatus.PAID,
-
-                source:
-                    TransactionSource.OTHER,
-
-                externalProvider,
-
-                externalTransactionId,
-            },
-
-            authContext,
-        )
+    if (!paymentMethod) {
+      throw new ApiError(
+        400,
+        "INVALID_PAYMENT_METHOD",
+        "Invalid payment method",
+      );
     }
 
-    async findAll(filters: IncomeFilters) {
-        return this.incomeRepository.findAll(filters)
+    const incomeEntity = this.incomeRepository.createEntity({
+      ...payload,
+      amount: Number(Number(payload.amount).toFixed(2)),
+    });
+
+    const income = await this.incomeRepository.save(incomeEntity);
+
+    await this.auditLogService.log({
+      companyId: income.companyId,
+      companyPublicId: income.companyPublicId,
+
+      entityType: AuditEntityType.INCOME,
+      entityId: income.id,
+      entityPublicId: income.publicId,
+
+      action: AuditAction.CREATE,
+
+      newValues: income,
+
+      authContext,
+    });
+
+    return income;
+  }
+
+  async createFromCrmPayment(
+    payload: CreateCrmPaymentIncomeDto & {
+      companyId: number;
+      companyPublicId?: string | null;
+      createdBy?: string;
+    },
+
+    authContext?: AuthContext,
+  ) {
+    const externalProvider = "MINDPRO_CRM";
+
+    const externalTransactionId = `PAYMENT:${payload.paymentId}`;
+
+    /*
+     * Idempotency check.
+     *
+     * A retry from CRM must not create
+     * another Income for the same Payment.
+     */
+    const existing = await this.incomeRepository.findByExternalReference({
+      companyId: payload.companyId,
+
+      externalProvider,
+
+      externalTransactionId,
+    });
+
+    if (existing) {
+      return existing;
     }
 
-    async findByPublicId(publicId: string, companyId: number) {
-        const income = await this.incomeRepository.findByPublicId(publicId)
+    /*
+     * Resolve the configured Income
+     * category for CRM payments.
+     */
+    const settings = await this.billingSettingsService.findByCompany(
+      payload.companyId,
+    );
 
-        if (!income || income.companyId !== companyId) {
-            throw new ApiError(
-            404,
-            'INCOME_NOT_FOUND',
-            'Income not found'
-            )
-        }
-
-        return income
+    if (!settings) {
+      throw new ApiError(
+        400,
+        "BILLING_SETTINGS_NOT_CONFIGURED",
+        "Billing settings have not been configured for this company.",
+      );
     }
 
-    async update(
-        publicId: string,
-        payload: UpdateIncomeDto,
-        companyId: number,
-        authContext?: AuthContext
-        ) {
-        const income = await this.findByPublicId(publicId, companyId)
+    const categoryId = settings.crmPaymentIncomeCategoryId;
 
-        const originalIncome = {
-            ...income,
-        }
-
-        const transactionDate = payload.incomeDate ?? income.incomeDate
-
-        await this.periodLockService.validateOpenPeriod(
-            income.companyId,
-            transactionDate
-        )
-
-        const normalizedPayload = {
-            ...payload,
-            amount:
-            payload.amount !== undefined
-                ? Number(Number(payload.amount).toFixed(2))
-                : undefined,
-        }
-
-        Object.assign(income, normalizedPayload)
-
-        const updatedIncome = await this.incomeRepository.save(income)
-
-        await this.auditLogService.log({
-            companyId: updatedIncome.companyId,
-            companyPublicId: updatedIncome.companyPublicId,
-            entityType: AuditEntityType.INCOME,
-            entityId: updatedIncome.id,
-            entityPublicId: updatedIncome.publicId,
-            action: AuditAction.UPDATE,
-            oldValues: originalIncome,
-            newValues: updatedIncome,
-            authContext,
-        })
-
-        return updatedIncome
+    if (!categoryId) {
+      throw new ApiError(
+        400,
+        "CRM_PAYMENT_INCOME_CATEGORY_NOT_CONFIGURED",
+        "The default income category for CRM payments has not been configured.",
+      );
     }
 
-    async softDelete(
-        publicId: string,
-        companyId: number,
-        authContext?: AuthContext
-        ) {
-        const income = await this.findByPublicId(publicId, companyId)
+    /*
+     * Delegate the actual accounting
+     * validation and persistence to the
+     * normal Income creation workflow.
+     */
+    return this.create(
+      {
+        companyId: payload.companyId,
 
-        await this.periodLockService.validateOpenPeriod(
-            income.companyId,
-            income.incomeDate
-        )
+        companyPublicId: payload.companyPublicId ?? null,
 
-        await this.incomeRepository.softDeleteById(income.id)
+        createdBy: payload.createdBy,
 
-        await this.auditLogService.log({
-            companyId: income.companyId,
-            companyPublicId: income.companyPublicId,
-            entityType: AuditEntityType.INCOME,
-            entityId: income.id,
-            entityPublicId: income.publicId,
-            action: AuditAction.DELETE,
-            oldValues: income,
-            authContext,
-        })
+        clientId: payload.clientId,
 
-        return {
-            publicId: income.publicId,
-            deleted: true,
-        }
+        caseId: payload.caseId,
+        clientName: payload.clientName ?? null,
+
+        caseReference: payload.caseReference ?? null,
+
+        amount: payload.amount,
+
+        currency: "USD",
+
+        incomeDate: payload.paymentDate,
+
+        categoryId,
+
+        paymentMethodCode: payload.paymentMethodCode,
+
+        description: payload.notes
+          ? `CRM payment #${payload.paymentId}: ${payload.notes}`
+          : `CRM payment #${payload.paymentId}`,
+
+        referenceNumber: payload.referenceNumber ?? undefined,
+
+        status: TransactionStatus.PAID,
+
+        source: TransactionSource.OTHER,
+
+        externalProvider,
+
+        externalTransactionId,
+      },
+
+      authContext,
+    );
+  }
+
+  async findAll(filters: IncomeFilters) {
+    return this.incomeRepository.findAll(filters);
+  }
+
+  async findByPublicId(publicId: string, companyId: number) {
+    const income = await this.incomeRepository.findByPublicId(publicId);
+
+    if (!income || income.companyId !== companyId) {
+      throw new ApiError(404, "INCOME_NOT_FOUND", "Income not found");
     }
+
+    return income;
+  }
+
+  async update(
+    publicId: string,
+    payload: UpdateIncomeDto,
+    companyId: number,
+    authContext?: AuthContext,
+  ) {
+    const income = await this.findByPublicId(publicId, companyId);
+
+    const originalIncome = {
+      ...income,
+    };
+
+    const transactionDate = payload.incomeDate ?? income.incomeDate;
+
+    await this.periodLockService.validateOpenPeriod(
+      income.companyId,
+      transactionDate,
+    );
+
+    const normalizedPayload = {
+      ...payload,
+      amount:
+        payload.amount !== undefined
+          ? Number(Number(payload.amount).toFixed(2))
+          : undefined,
+    };
+
+    Object.assign(income, normalizedPayload);
+
+    const updatedIncome = await this.incomeRepository.save(income);
+
+    await this.auditLogService.log({
+      companyId: updatedIncome.companyId,
+      companyPublicId: updatedIncome.companyPublicId,
+      entityType: AuditEntityType.INCOME,
+      entityId: updatedIncome.id,
+      entityPublicId: updatedIncome.publicId,
+      action: AuditAction.UPDATE,
+      oldValues: originalIncome,
+      newValues: updatedIncome,
+      authContext,
+    });
+
+    return updatedIncome;
+  }
+
+  async softDelete(
+    publicId: string,
+    companyId: number,
+    authContext?: AuthContext,
+  ) {
+    const income = await this.findByPublicId(publicId, companyId);
+
+    await this.periodLockService.validateOpenPeriod(
+      income.companyId,
+      income.incomeDate,
+    );
+
+    await this.incomeRepository.softDeleteById(income.id);
+
+    await this.auditLogService.log({
+      companyId: income.companyId,
+      companyPublicId: income.companyPublicId,
+      entityType: AuditEntityType.INCOME,
+      entityId: income.id,
+      entityPublicId: income.publicId,
+      action: AuditAction.DELETE,
+      oldValues: income,
+      authContext,
+    });
+
+    return {
+      publicId: income.publicId,
+      deleted: true,
+    };
+  }
 }

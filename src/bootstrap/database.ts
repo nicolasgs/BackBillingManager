@@ -1,18 +1,23 @@
-import 'reflect-metadata'
-import { DataSource } from 'typeorm'
-import { env } from '../config/env'
-import { BillingCategoryEntity } from '../modules/billing-categories/billing-category.entity'
-import { PaymentMethodTypeEntity } from '../modules/payment-method-type/payment-method-type.entity'
-import { IncomeEntity } from '../modules/incomes/income.entity'
-import { VendorEntity } from '../modules/vendors/vendor.entity'
-import { ExpenseEntity } from '../modules/expenses/expense.entity'
-import { MonthlyClosingEntity } from '../modules/monthly-closings/monthly-closing.entity'
-import { MonthlyClosingItemEntity } from '../modules/monthly-closings/monthly-closing-item.entity'
-import { BillingAuditLogEntity } from '../modules/audit-logs/audit-log.entity'
-import { BillingSettingsEntity } from  '../modules/billing-settings/billing-settings.entity'
+import "reflect-metadata";
+import { DataSource } from "typeorm";
+
+import { env } from "../config/env";
+
+import { BillingCategoryEntity } from "../modules/billing-categories/billing-category.entity";
+import { PaymentMethodTypeEntity } from "../modules/payment-method-type/payment-method-type.entity";
+import { IncomeEntity } from "../modules/incomes/income.entity";
+import { VendorEntity } from "../modules/vendors/vendor.entity";
+import { ExpenseEntity } from "../modules/expenses/expense.entity";
+import { MonthlyClosingEntity } from "../modules/monthly-closings/monthly-closing.entity";
+import { MonthlyClosingItemEntity } from "../modules/monthly-closings/monthly-closing-item.entity";
+import { BillingAuditLogEntity } from "../modules/audit-logs/audit-log.entity";
+import { BillingSettingsEntity } from "../modules/billing-settings/billing-settings.entity";
+import { ReceiptEntity } from "../modules/receipts/receipt.entity";
+import { ReceiptSequenceEntity } from "../modules/receipts/receipt-sequence.entity";
 
 export const AppDataSource = new DataSource({
-  type: 'postgres',
+  type: "postgres",
+
   host: env.DB_HOST,
   port: env.DB_PORT,
   username: env.DB_USERNAME,
@@ -42,5 +47,7 @@ export const AppDataSource = new DataSource({
     MonthlyClosingItemEntity,
     BillingAuditLogEntity,
     BillingSettingsEntity,
+    ReceiptEntity,
+    ReceiptSequenceEntity,
   ],
-})
+});

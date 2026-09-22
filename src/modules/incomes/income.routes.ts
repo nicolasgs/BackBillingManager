@@ -46,6 +46,26 @@ router.post(
 router.get("/", validate(listIncomesQuerySchema, "query"), controller.findAll);
 
 /*
+ * Generate or retrieve Receipt
+ * for an Income.
+ */
+router.post(
+  "/:publicId/receipt",
+  validate(incomeParamsSchema, "params"),
+  controller.createReceipt,
+);
+
+/*
+ * Retrieve Receipt associated
+ * with an Income.
+ */
+router.get(
+  "/:publicId/receipt",
+  validate(incomeParamsSchema, "params"),
+  controller.findReceipt,
+);
+
+/*
  * Detail
  */
 router.get(
