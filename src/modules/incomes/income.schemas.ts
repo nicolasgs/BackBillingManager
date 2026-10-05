@@ -105,6 +105,8 @@ export const createCrmPaymentIncomeSchema = z.object({
 
   caseId: z.coerce.number().int().positive(),
 
+  casePublicId: z.string().uuid(),
+
   clientName: z.string().max(255).nullable().optional(),
 
   caseReference: z.string().max(255).nullable().optional(),

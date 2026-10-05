@@ -7,3 +7,5 @@ export * from "./audit-action.enum";
 export * from "./audit-entity-type.enum";
 export * from "./closing-type.enum";
 export * from "./receipt-storage-provider.enum";
+export * from "./revenue-participant-type.enum";
+export * from "./compensation-type.enum";

@@ -1,0 +1,4 @@
+export enum RevenueParticipantType {
+  ASSOCIATED_ATTORNEY = "ASSOCIATED_ATTORNEY",
+  COUNSELOR = "COUNSELOR",
+}

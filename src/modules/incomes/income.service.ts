@@ -160,6 +160,7 @@ export class IncomeService {
         clientId: payload.clientId,
 
         caseId: payload.caseId,
+        casePublicId: payload.casePublicId,
         clientName: payload.clientName ?? null,
 
         caseReference: payload.caseReference ?? null,

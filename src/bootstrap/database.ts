@@ -14,6 +14,7 @@ import { BillingAuditLogEntity } from "../modules/audit-logs/audit-log.entity";
 import { BillingSettingsEntity } from "../modules/billing-settings/billing-settings.entity";
 import { ReceiptEntity } from "../modules/receipts/receipt.entity";
 import { ReceiptSequenceEntity } from "../modules/receipts/receipt-sequence.entity";
+import { RevenueAgreementEntity } from "../modules/revenue-agreements/revenue-agreement.entity";
 
 export const AppDataSource = new DataSource({
   type: "postgres",
@@ -49,5 +50,6 @@ export const AppDataSource = new DataSource({
     BillingSettingsEntity,
     ReceiptEntity,
     ReceiptSequenceEntity,
+    RevenueAgreementEntity,
   ],
 });

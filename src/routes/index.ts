@@ -11,6 +11,7 @@ import auditLogRoutes from "../modules/audit-logs/audit-log.routes";
 import reportsRoutes from "../modules/report/reports.routes";
 import billingSettingsRoutes from "../modules/billing-settings/billing-settings.routes";
 import receiptRoutes from "../modules/receipts/receipt.routes";
+import revenueAgreementRoutes from "../modules/revenue-agreements/revenue-agreement.routes";
 
 import { authMiddleware } from "../middlewares/auth.middleware";
 
@@ -31,5 +32,6 @@ router.use("/billing-categories", authMiddleware, billingCategoryRoutes);
 router.use("/payment-method-type", authMiddleware, paymentMethodTypeRoutes);
 router.use("/billing-settings", authMiddleware, billingSettingsRoutes);
 router.use("/receipts", authMiddleware, receiptRoutes);
+router.use("/revenue-agreements", authMiddleware, revenueAgreementRoutes);
 
 export default router;
