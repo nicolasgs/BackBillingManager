@@ -1,4 +1,4 @@
-import { IsNull } from "typeorm";
+import { EntityManager, IsNull } from "typeorm";
 
 import { AppDataSource } from "../../bootstrap/database";
 import {
@@ -140,6 +140,50 @@ export class RevenueAgreementRepository {
     return Number(result?.total ?? 0);
   }
 
+  async findEffectiveForCase(
+    params: {
+      companyId: number;
+      casePublicId: string;
+      incomeDate: string;
+    },
+    manager: EntityManager,
+  ) {
+    return manager
+      .getRepository(RevenueAgreementEntity)
+      .createQueryBuilder("agreement")
+      .where(
+        "agreement.companyId = :companyId",
+        {
+          companyId: params.companyId,
+        },
+      )
+      .andWhere(
+        "agreement.casePublicId = :casePublicId",
+        {
+          casePublicId: params.casePublicId,
+        },
+      )
+      .andWhere("agreement.deletedAt IS NULL")
+      .andWhere(
+        "agreement.effectiveFrom <= :incomeDate",
+        {
+          incomeDate: params.incomeDate,
+        },
+      )
+      .andWhere(
+        `(
+          agreement.endedAt IS NULL
+          OR agreement.endedAt >= :incomeDate
+        )`,
+        {
+          incomeDate: params.incomeDate,
+        },
+      )
+      .orderBy("agreement.priority", "ASC")
+      .addOrderBy("agreement.id", "ASC")
+      .setLock("pessimistic_write")
+      .getMany();
+  }
   async findAll(filters: RevenueAgreementFilters) {
     const query = this.repository
       .createQueryBuilder("agreement")

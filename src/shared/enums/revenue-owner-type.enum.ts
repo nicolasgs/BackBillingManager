@@ -1,0 +1,5 @@
+export enum RevenueOwnerType {
+  TENANT = "TENANT",
+  ASSOCIATED_ATTORNEY = "ASSOCIATED_ATTORNEY",
+  COUNSELOR = "COUNSELOR",
+}
