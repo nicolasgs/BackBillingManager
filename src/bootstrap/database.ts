@@ -16,6 +16,8 @@ import { ReceiptEntity } from "../modules/receipts/receipt.entity";
 import { ReceiptSequenceEntity } from "../modules/receipts/receipt-sequence.entity";
 import { RevenueAgreementEntity } from "../modules/revenue-agreements/revenue-agreement.entity";
 import { IncomeAllocationEntity } from "../modules/income-allocations/income-allocation.entity";
+import { MonthlyClosingParticipantStatementEntity } from "../modules/monthly-closings/monthly-closing-participant-statement.entity";
+import { MonthlyClosingParticipantStatementItemEntity } from "../modules/monthly-closings/monthly-closing-participant-statement-item.entity";
 
 export const AppDataSource = new DataSource({
   type: "postgres",
@@ -53,5 +55,7 @@ export const AppDataSource = new DataSource({
     ReceiptSequenceEntity,
     RevenueAgreementEntity,
     IncomeAllocationEntity,
+    MonthlyClosingParticipantStatementEntity,
+    MonthlyClosingParticipantStatementItemEntity,
   ],
 });

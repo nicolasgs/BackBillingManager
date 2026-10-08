@@ -1,8 +1,10 @@
 import { Check, Column, Entity, Index, OneToMany } from "typeorm";
-import { BaseEntity } from "../../shared/entities/base.entity";
+
 import { numericTransformer } from "../../shared/database/numeric.transformer";
-import { MonthlyClosingItemEntity } from "./monthly-closing-item.entity";
+import { BaseEntity } from "../../shared/entities/base.entity";
 import { ClosingStatus, ClosingType } from "../../shared/enums";
+import { MonthlyClosingItemEntity } from "./monthly-closing-item.entity";
+import { MonthlyClosingParticipantStatementEntity } from "./monthly-closing-participant-statement.entity";
 
 @Entity("monthly_closings")
 @Index(["companyId", "year", "month"], { unique: true })
@@ -97,6 +99,15 @@ export class MonthlyClosingEntity extends BaseEntity {
   })
   closedAt?: Date | null;
 
-  @OneToMany(() => MonthlyClosingItemEntity, (item) => item.monthlyClosing)
+  @OneToMany(
+    () => MonthlyClosingItemEntity,
+    (item) => item.monthlyClosing,
+  )
   items!: MonthlyClosingItemEntity[];
+
+  @OneToMany(
+    () => MonthlyClosingParticipantStatementEntity,
+    (statement) => statement.monthlyClosing,
+  )
+  participantStatements!: MonthlyClosingParticipantStatementEntity[];
 }
