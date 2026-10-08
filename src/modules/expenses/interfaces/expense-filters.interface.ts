@@ -1,17 +1,34 @@
-import { TransactionStatus } from '../../../shared/enums'
+import {
+  RevenueOwnerType,
+  TransactionStatus,
+} from "../../../shared/enums";
 
 export interface ExpenseFilters {
-    companyId: number
-    companyPublicId?: string | null
+  companyId: number;
 
-    vendorId?: number
-    vendorPublicId?: string | null
-    vendorName?: string
+  companyPublicId?: string | null;
 
-    categoryId?: number
-    paymentMethodCode?: string
-    status?: TransactionStatus
+  vendorId?: number;
 
-    fromDate?: string
-    toDate?: string
+  vendorPublicId?: string | null;
+
+  vendorName?: string;
+
+  caseId?: number;
+
+  casePublicId?: string;
+
+  attributedToType?: RevenueOwnerType;
+
+  attributedToPublicId?: string;
+
+  categoryId?: number;
+
+  paymentMethodCode?: string;
+
+  status?: TransactionStatus;
+
+  fromDate?: string;
+
+  toDate?: string;
 }

@@ -1,53 +1,290 @@
-import { z } from 'zod'
-import { TransactionSource, TransactionStatus } from '../../shared/enums'
+import { z } from "zod";
+
+import {
+  RevenueOwnerType,
+  TransactionSource,
+  TransactionStatus,
+} from "../../shared/enums";
 
 export const createExpenseSchema = z.object({
-    companyId: z.coerce.number().int().positive(),
-    companyPublicId: z.string().uuid().nullable().optional(),
+  companyId: z.coerce.number().int().positive(),
 
-    vendorId: z.coerce.number().int().positive().optional(),
-    vendorPublicId: z.string().uuid().nullable().optional(),
-    vendorName: z.string().max(150).nullable().optional(),
+  companyPublicId: z
+    .string()
+    .uuid()
+    .nullable()
+    .optional(),
 
-    amount: z.coerce.number().positive(),
-    currency: z.string().length(3).default('USD'),
+  vendorId: z.coerce
+    .number()
+    .int()
+    .positive()
+    .optional(),
 
-    expenseDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  vendorPublicId: z
+    .string()
+    .uuid()
+    .nullable()
+    .optional(),
 
-    categoryId: z.coerce.number().int().positive(),
-    paymentMethodCode: z.string().min(2).max(20).toUpperCase(),
+  vendorName: z
+    .string()
+    .max(150)
+    .nullable()
+    .optional(),
 
-    description: z.string().max(1000).nullable().optional(),
-    referenceNumber: z.string().max(100).nullable().optional(),
+  caseId: z.coerce
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .optional(),
 
-    status: z.nativeEnum(TransactionStatus).default(TransactionStatus.PAID),
-    source: z.nativeEnum(TransactionSource).default(TransactionSource.MANUAL),
+  casePublicId: z
+    .string()
+    .uuid()
+    .nullable()
+    .optional(),
 
-    externalProvider: z.string().max(50).nullable().optional(),
-    externalTransactionId: z.string().max(150).nullable().optional(),
+  attributedToType: z
+    .nativeEnum(RevenueOwnerType)
+    .default(RevenueOwnerType.TENANT),
 
-    createdBy: z.string().min(1).max(100).optional()
-})
+  attributedToPublicId: z
+    .string()
+    .uuid()
+    .nullable()
+    .optional(),
 
-export const updateExpenseSchema = createExpenseSchema.partial().omit({
-    companyId: true,
-    createdBy: true,
-})
+  amount: z.coerce.number().positive(),
+
+  currency: z
+    .string()
+    .length(3)
+    .default("USD"),
+
+  expenseDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/),
+
+  categoryId: z.coerce
+    .number()
+    .int()
+    .positive(),
+
+  paymentMethodCode: z
+    .string()
+    .min(2)
+    .max(20)
+    .toUpperCase(),
+
+  description: z
+    .string()
+    .max(1000)
+    .nullable()
+    .optional(),
+
+  referenceNumber: z
+    .string()
+    .max(100)
+    .nullable()
+    .optional(),
+
+  status: z
+    .nativeEnum(TransactionStatus)
+    .default(TransactionStatus.PAID),
+
+  source: z
+    .nativeEnum(TransactionSource)
+    .default(TransactionSource.MANUAL),
+
+  externalProvider: z
+    .string()
+    .max(50)
+    .nullable()
+    .optional(),
+
+  externalTransactionId: z
+    .string()
+    .max(150)
+    .nullable()
+    .optional(),
+
+  createdBy: z
+    .string()
+    .min(1)
+    .max(100)
+    .optional(),
+});
+
+export const updateExpenseSchema = z.object({
+  vendorId: z.coerce
+    .number()
+    .int()
+    .positive()
+    .optional(),
+
+  vendorPublicId: z
+    .string()
+    .uuid()
+    .nullable()
+    .optional(),
+
+  vendorName: z
+    .string()
+    .max(150)
+    .nullable()
+    .optional(),
+
+  caseId: z.coerce
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .optional(),
+
+  casePublicId: z
+    .string()
+    .uuid()
+    .nullable()
+    .optional(),
+
+  attributedToType: z
+    .nativeEnum(RevenueOwnerType)
+    .optional(),
+
+  attributedToPublicId: z
+    .string()
+    .uuid()
+    .nullable()
+    .optional(),
+
+  amount: z.coerce
+    .number()
+    .positive()
+    .optional(),
+
+  currency: z
+    .string()
+    .length(3)
+    .optional(),
+
+  expenseDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+
+  categoryId: z.coerce
+    .number()
+    .int()
+    .positive()
+    .optional(),
+
+  paymentMethodCode: z
+    .string()
+    .min(2)
+    .max(20)
+    .toUpperCase()
+    .optional(),
+
+  description: z
+    .string()
+    .max(1000)
+    .nullable()
+    .optional(),
+
+  referenceNumber: z
+    .string()
+    .max(100)
+    .nullable()
+    .optional(),
+
+  status: z
+    .nativeEnum(TransactionStatus)
+    .optional(),
+
+  source: z
+    .nativeEnum(TransactionSource)
+    .optional(),
+
+  externalProvider: z
+    .string()
+    .max(50)
+    .nullable()
+    .optional(),
+
+  externalTransactionId: z
+    .string()
+    .max(150)
+    .nullable()
+    .optional(),
+});
 
 export const expenseParamsSchema = z.object({
-    publicId: z.string().uuid(),
-})
+  publicId: z.string().uuid(),
+});
 
 export const listExpensesQuerySchema = z.object({
+  vendorId: z.coerce
+    .number()
+    .int()
+    .positive()
+    .optional(),
 
-    vendorId: z.coerce.number().int().positive().optional(),
-    vendorPublicId: z.string().uuid().nullable().optional(),
-    vendorName: z.string().max(150).optional(),
+  vendorPublicId: z
+    .string()
+    .uuid()
+    .nullable()
+    .optional(),
 
-    categoryId: z.coerce.number().int().positive().optional(),
-    paymentMethodCode: z.string().min(2).max(20).optional(),
-    status: z.nativeEnum(TransactionStatus).optional(),
+  vendorName: z
+    .string()
+    .max(150)
+    .optional(),
 
-    fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-    toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-})
+  caseId: z.coerce
+    .number()
+    .int()
+    .positive()
+    .optional(),
+
+  casePublicId: z
+    .string()
+    .uuid()
+    .optional(),
+
+  attributedToType: z
+    .nativeEnum(RevenueOwnerType)
+    .optional(),
+
+  attributedToPublicId: z
+    .string()
+    .uuid()
+    .optional(),
+
+  categoryId: z.coerce
+    .number()
+    .int()
+    .positive()
+    .optional(),
+
+  paymentMethodCode: z
+    .string()
+    .min(2)
+    .max(20)
+    .optional(),
+
+  status: z
+    .nativeEnum(TransactionStatus)
+    .optional(),
+
+  fromDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+
+  toDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+});
