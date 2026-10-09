@@ -12,6 +12,7 @@ import reportsRoutes from "../modules/report/reports.routes";
 import billingSettingsRoutes from "../modules/billing-settings/billing-settings.routes";
 import receiptRoutes from "../modules/receipts/receipt.routes";
 import revenueAgreementRoutes from "../modules/revenue-agreements/revenue-agreement.routes";
+import participantSettlementRoutes, { participantPayoutRoutes, participantStatementSettlementRoutes } from "../modules/participant-settlements/participant-settlement.routes";
 
 import { authMiddleware } from "../middlewares/auth.middleware";
 
@@ -33,5 +34,8 @@ router.use("/payment-method-type", authMiddleware, paymentMethodTypeRoutes);
 router.use("/billing-settings", authMiddleware, billingSettingsRoutes);
 router.use("/receipts", authMiddleware, receiptRoutes);
 router.use("/revenue-agreements", authMiddleware, revenueAgreementRoutes);
+router.use("/participant-statements", authMiddleware, participantStatementSettlementRoutes);
+router.use("/participant-settlements", authMiddleware, participantSettlementRoutes);
+router.use("/participant-payouts", authMiddleware, participantPayoutRoutes);
 
 export default router;

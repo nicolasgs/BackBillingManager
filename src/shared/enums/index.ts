@@ -10,3 +10,6 @@ export * from "./receipt-storage-provider.enum";
 export * from "./revenue-participant-type.enum";
 export * from "./revenue-owner-type.enum";
 export * from "./compensation-type.enum";
+
+export * from "./participant-settlement-status.enum";
+export * from "./participant-payout-status.enum";

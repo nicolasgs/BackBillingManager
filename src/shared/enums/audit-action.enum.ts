@@ -4,4 +4,5 @@ export enum AuditAction {
     DELETE = 'DELETE',
     CLOSE = 'CLOSE',
     REOPEN = 'REOPEN',
+    VOID = 'VOID',
 }

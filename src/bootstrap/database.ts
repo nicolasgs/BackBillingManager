@@ -18,6 +18,8 @@ import { RevenueAgreementEntity } from "../modules/revenue-agreements/revenue-ag
 import { IncomeAllocationEntity } from "../modules/income-allocations/income-allocation.entity";
 import { MonthlyClosingParticipantStatementEntity } from "../modules/monthly-closings/monthly-closing-participant-statement.entity";
 import { MonthlyClosingParticipantStatementItemEntity } from "../modules/monthly-closings/monthly-closing-participant-statement-item.entity";
+import { ParticipantSettlementEntity } from "../modules/participant-settlements/participant-settlement.entity";
+import { ParticipantPayoutEntity } from "../modules/participant-settlements/participant-payout.entity";
 
 export const AppDataSource = new DataSource({
   type: "postgres",
@@ -57,5 +59,7 @@ export const AppDataSource = new DataSource({
     IncomeAllocationEntity,
     MonthlyClosingParticipantStatementEntity,
     MonthlyClosingParticipantStatementItemEntity,
+    ParticipantSettlementEntity,
+    ParticipantPayoutEntity,
   ],
 });

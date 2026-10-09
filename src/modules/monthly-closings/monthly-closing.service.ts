@@ -156,14 +156,10 @@ export class MonthlyClosingService {
     };
 
     const notes = payload.notes ?? closing.notes;
-
-    await this.repository.updateById(closing.id, {
-      status: ClosingStatus.REOPENED,
-
+    await this.repository.reopenWithSettlementGuard({
+      closingId: closing.id,
+      companyId: closing.companyId,
       notes,
-
-      closedBy: null,
-      closedAt: null,
     });
 
     const result = await this.findByPublicId(publicId, companyId);

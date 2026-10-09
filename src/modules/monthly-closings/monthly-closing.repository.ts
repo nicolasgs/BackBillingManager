@@ -887,4 +887,109 @@ export class MonthlyClosingRepository {
       };
     });
   }
+
+  async reopenWithSettlementGuard(params: {
+    closingId: number;
+    companyId: number;
+    notes: string | null | undefined;
+  }) {
+    return AppDataSource.transaction(
+      async (manager) => {
+        const closingRepository =
+          manager.getRepository(
+            MonthlyClosingEntity,
+          );
+
+        const statementRepository =
+          manager.getRepository(
+            MonthlyClosingParticipantStatementEntity,
+          );
+
+        /*
+         * Settlement creation locks this same
+         * monthly_closings row. This makes
+         * REOPEN vs settlement creation atomic.
+         */
+        const closing =
+          await closingRepository.findOne({
+            where: {
+              id: params.closingId,
+              companyId:
+                params.companyId,
+              deletedAt: IsNull(),
+            },
+            lock: {
+              mode: "pessimistic_write",
+            },
+          });
+
+        if (!closing) {
+          throw new ApiError(
+            404,
+            "MONTHLY_CLOSING_NOT_FOUND",
+            "Monthly closing not found",
+          );
+        }
+
+        if (
+          closing.status !==
+          ClosingStatus.CLOSED
+        ) {
+          throw new ApiError(
+            400,
+            "MONTHLY_CLOSING_NOT_CLOSED",
+            "Only closed monthly closings can be reopened",
+          );
+        }
+
+        const settlementCount =
+          await statementRepository
+            .createQueryBuilder(
+              "statement",
+            )
+            .innerJoin(
+              "participant_settlements",
+              "settlement",
+              "settlement.participant_statement_id = statement.id AND settlement.deleted_at IS NULL",
+            )
+            .where(
+              "statement.monthly_closing_id = :closingId",
+              {
+                closingId:
+                  closing.id,
+              },
+            )
+            .andWhere(
+              "statement.deleted_at IS NULL",
+            )
+            .getCount();
+
+        if (
+          settlementCount > 0
+        ) {
+          throw new ApiError(
+            409,
+            "MONTHLY_CLOSING_HAS_SETTLEMENTS",
+            "Monthly closing cannot be reopened because participant settlements already exist",
+          );
+        }
+
+        await closingRepository.update(
+          {
+            id: closing.id,
+          },
+          {
+            status:
+              ClosingStatus.REOPENED,
+
+            notes:
+              params.notes,
+
+            closedBy: null,
+            closedAt: null,
+          },
+        );
+      },
+    );
+  }
 }
