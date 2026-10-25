@@ -218,7 +218,8 @@ export class IncomeService {
      * revenue allocations in the same
      * database transaction.
      */
-    return this.create(
+    try {
+      return await this.create(
       {
         companyId: payload.companyId,
 
@@ -276,6 +277,27 @@ export class IncomeService {
 
       authContext,
     );
+    } catch (error: any) {
+      /*
+       * The database unique index is the final
+       * idempotency guard for concurrent CRM retries.
+       */
+      if (error?.code === "23505") {
+        const concurrentExisting =
+          await this.incomeRepository
+            .findByExternalReference({
+              companyId: payload.companyId,
+              externalProvider,
+              externalTransactionId,
+            });
+
+        if (concurrentExisting) {
+          return concurrentExisting;
+        }
+      }
+
+      throw error;
+    }
   }
 
   async findAll(
