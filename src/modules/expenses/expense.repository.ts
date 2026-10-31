@@ -1,4 +1,4 @@
-import { IsNull } from "typeorm";
+import { EntityManager, IsNull } from "typeorm";
 
 import { AppDataSource } from "../../bootstrap/database";
 import { ExpenseEntity } from "./expense.entity";
@@ -10,12 +10,24 @@ export class ExpenseRepository {
 
   createEntity(
     payload: Partial<ExpenseEntity>,
+    manager?: EntityManager,
   ) {
-    return this.repository.create(payload);
+    const repository = manager
+      ? manager.getRepository(ExpenseEntity)
+      : this.repository;
+
+    return repository.create(payload);
   }
 
-  save(expense: ExpenseEntity) {
-    return this.repository.save(expense);
+  save(
+    expense: ExpenseEntity,
+    manager?: EntityManager,
+  ) {
+    const repository = manager
+      ? manager.getRepository(ExpenseEntity)
+      : this.repository;
+
+    return repository.save(expense);
   }
 
   findAll(filters: ExpenseFilters) {
@@ -195,7 +207,39 @@ export class ExpenseRepository {
     });
   }
 
-  softDeleteById(id: number) {
-    return this.repository.softDelete(id);
+  findByPublicIdForUpdate(
+    publicId: string,
+    companyId: number,
+    manager: EntityManager,
+  ) {
+    return manager
+      .getRepository(ExpenseEntity)
+      .createQueryBuilder("expense")
+      .where(
+        "expense.publicId = :publicId",
+        {
+          publicId,
+        },
+      )
+      .andWhere(
+        "expense.companyId = :companyId",
+        {
+          companyId,
+        },
+      )
+      .andWhere("expense.deletedAt IS NULL")
+      .setLock("pessimistic_write")
+      .getOne();
+  }
+
+  softDeleteById(
+    id: number,
+    manager?: EntityManager,
+  ) {
+    const repository = manager
+      ? manager.getRepository(ExpenseEntity)
+      : this.repository;
+
+    return repository.softDelete(id);
   }
 }

@@ -17,6 +17,7 @@ import { MonthlyClosingItemEntity } from "./monthly-closing-item.entity";
 import { MonthlyClosingParticipantStatementItemEntity } from "./monthly-closing-participant-statement-item.entity";
 import { MonthlyClosingParticipantStatementEntity } from "./monthly-closing-participant-statement.entity";
 import { MonthlyClosingEntity } from "./monthly-closing.entity";
+import { PeriodLockService } from "./services/period-lock.service";
 
 type ParticipantLineDraft = {
   itemType: "INCOME_ALLOCATION" | "EXPENSE";
@@ -61,6 +62,9 @@ export class MonthlyClosingRepository {
   private incomeRepository = AppDataSource.getRepository(IncomeEntity);
 
   private expenseRepository = AppDataSource.getRepository(ExpenseEntity);
+
+  private periodLockService =
+    new PeriodLockService();
 
   createEntity(payload: Partial<MonthlyClosingEntity>) {
     return this.closingRepository.create(payload);
@@ -250,6 +254,19 @@ export class MonthlyClosingRepository {
           "Monthly closing is already closed",
         );
       }
+
+      /*
+       * Serialize this close with every Income /
+       * Expense mutation for the same accounting
+       * period before the snapshot is read.
+       */
+      await this.periodLockService
+        .lockPeriod(
+          closing.companyId,
+          closing.year,
+          closing.month,
+          manager,
+        );
 
       const { startDate, endDate } =
         this.getPeriodRange(
@@ -941,6 +958,21 @@ export class MonthlyClosingRepository {
             "Only closed monthly closings can be reopened",
           );
         }
+
+        /*
+         * Keep reopen serialized with Income /
+         * Expense mutations for this period.
+         *
+         * Writers waiting on this lock will validate
+         * the period only after reopen commits.
+         */
+        await this.periodLockService
+          .lockPeriod(
+            closing.companyId,
+            closing.year,
+            closing.month,
+            manager,
+          );
 
         const settlementCount =
           await statementRepository

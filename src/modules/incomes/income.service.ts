@@ -56,6 +56,7 @@ export class IncomeService {
 
   private async validateCreatePayload(
     payload: CreateIncomeDto,
+    manager: EntityManager,
   ) {
     const category =
       await this.categoryRepository
@@ -69,6 +70,7 @@ export class IncomeService {
       .validateOpenPeriod(
         payload.companyId,
         payload.incomeDate,
+        manager,
       );
 
     if (!category) {
@@ -140,25 +142,27 @@ export class IncomeService {
     payload: CreateIncomeDto,
     authContext?: AuthContext,
   ) {
-    await this.validateCreatePayload(
-      payload,
-    );
-
     /*
-     * Income + automatic allocation are one
-     * accounting transaction.
+     * Period lock, validation, Income and automatic
+     * allocation are one accounting transaction.
      *
-     * If allocation fails, Income creation
-     * rolls back as well.
+     * A concurrent monthly close therefore cannot
+     * commit between period validation and creation.
      */
     const income =
       await AppDataSource.transaction(
-        async (manager) =>
-          this.createInTransaction(
+        async (manager) => {
+          await this.validateCreatePayload(
+            payload,
+            manager,
+          );
+
+          return this.createInTransaction(
             payload,
             authContext,
             manager,
-          ),
+          );
+        },
       );
 
     await this.auditLogService.log({
@@ -306,13 +310,6 @@ export class IncomeService {
       externalTransactionId,
     };
 
-    /*
-     * Preserve the same validations previously
-     * applied through create().
-     */
-    await this.validateCreatePayload(
-      incomePayload,
-    );
 
     let transactionResult: {
       income: IncomeEntity;
@@ -354,6 +351,55 @@ export class IncomeService {
                 created: false,
               };
             }
+
+            /*
+             * Another CRM retry may have created the
+             * Income while this transaction was waiting
+             * for the accounting-period lock.
+             *
+             * Re-check after the lock so an idempotent
+             * retry can return the existing Income even
+             * if the period was closed immediately after
+             * the original creation committed.
+             */
+            await this.periodLockService
+              .lockTransactionPeriod(
+                incomePayload.companyId,
+                incomePayload.incomeDate,
+                manager,
+              );
+
+            const existingAfterPeriodLock =
+              await this.incomeRepository
+                .findByExternalReference(
+                  {
+                    companyId:
+                      payload.companyId,
+                    externalProvider,
+                    externalTransactionId,
+                  },
+                  manager,
+                );
+
+            if (existingAfterPeriodLock) {
+              await this.receiptService
+                .createForIncomeInTransaction(
+                  existingAfterPeriodLock,
+                  createdBy,
+                  manager,
+                );
+
+              return {
+                income:
+                  existingAfterPeriodLock,
+                created: false,
+              };
+            }
+
+            await this.validateCreatePayload(
+              incomePayload,
+              manager,
+            );
 
             const createdIncome =
               await this.createInTransaction(
@@ -520,21 +566,14 @@ export class IncomeService {
            * - the new period gains one
            */
           await this.periodLockService
-            .validateOpenPeriod(
+            .validateOpenPeriods(
               income.companyId,
-              originalDate,
-            );
-
-          if (
-            transactionDate !==
-            originalDate
-          ) {
-            await this.periodLockService
-              .validateOpenPeriod(
-                income.companyId,
+              [
+                originalDate,
                 transactionDate,
-              );
-          }
+              ],
+              manager,
+            );
 
           const hasAllocations =
             await this.incomeAllocationService
@@ -677,6 +716,7 @@ export class IncomeService {
             .validateOpenPeriod(
               lockedIncome.companyId,
               lockedIncome.incomeDate,
+              manager,
             );
 
           const hasAllocations =

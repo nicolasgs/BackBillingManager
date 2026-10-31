@@ -1,3 +1,4 @@
+import { AppDataSource } from "../../bootstrap/database";
 import { ApiError } from "../../shared/errors";
 import {
   AuditAction,
@@ -67,11 +68,6 @@ export class ExpenseService {
           type: BillingCategoryType.EXPENSE,
         });
 
-    await this.periodLockService
-      .validateOpenPeriod(
-        payload.companyId,
-        payload.expenseDate,
-      );
 
     if (!category) {
       throw new ApiError(
@@ -141,33 +137,50 @@ export class ExpenseService {
           null,
       });
 
-    const expenseEntity =
-      this.expenseRepository
-        .createEntity({
-          ...payload,
-
-          vendorName,
-          vendorPublicId,
-
-          attributedToType:
-            attribution.attributedToType,
-
-          attributedToPublicId:
-            attribution.attributedToPublicId,
-
-          attributedToName:
-            attribution.attributedToName,
-
-          amount: Number(
-            Number(
-              payload.amount,
-            ).toFixed(2),
-          ),
-        });
-
     const expense =
-      await this.expenseRepository
-        .save(expenseEntity);
+      await AppDataSource.transaction(
+        async (manager) => {
+          await this.periodLockService
+            .validateOpenPeriod(
+              payload.companyId,
+              payload.expenseDate,
+              manager,
+            );
+
+          const expenseEntity =
+            this.expenseRepository
+              .createEntity(
+                {
+                  ...payload,
+
+                  vendorName,
+                  vendorPublicId,
+
+                  attributedToType:
+                    attribution.attributedToType,
+
+                  attributedToPublicId:
+                    attribution.attributedToPublicId,
+
+                  attributedToName:
+                    attribution.attributedToName,
+
+                  amount: Number(
+                    Number(
+                      payload.amount,
+                    ).toFixed(2),
+                  ),
+                },
+                manager,
+              );
+
+          return this.expenseRepository
+            .save(
+              expenseEntity,
+              manager,
+            );
+        },
+      );
 
     await this.auditLogService.log({
       companyId: expense.companyId,
@@ -231,234 +244,280 @@ export class ExpenseService {
     companyId: number,
     authContext?: AuthContext,
   ) {
-    const expense =
-      await this.findByPublicId(
-        publicId,
-        companyId,
-      );
+    const transactionResult =
+      await AppDataSource.transaction(
+        async (manager) => {
+          const expense =
+            await this.expenseRepository
+              .findByPublicIdForUpdate(
+                publicId,
+                companyId,
+                manager,
+              );
 
-    const originalExpense = {
-      ...expense,
-    };
+          if (!expense) {
+            throw new ApiError(
+              404,
+              "EXPENSE_NOT_FOUND",
+              "Expense not found",
+            );
+          }
 
-    const originalDate =
-      expense.expenseDate;
+          const originalExpense = {
+            ...expense,
+          };
 
-    const transactionDate =
-      payload.expenseDate ??
-      expense.expenseDate;
+          const originalDate =
+            expense.expenseDate;
 
-    /*
-     * Moving an Expense changes both
-     * accounting periods.
-     */
-    await this.periodLockService
-      .validateOpenPeriod(
-        expense.companyId,
-        originalDate,
-      );
+          const transactionDate =
+            payload.expenseDate ??
+            expense.expenseDate;
 
-    if (
-      transactionDate !==
-      originalDate
-    ) {
-      await this.periodLockService
-        .validateOpenPeriod(
-          expense.companyId,
-          transactionDate,
-        );
-    }
-
-    if (
-      payload.categoryId !== undefined
-    ) {
-      const category =
-        await this.categoryRepository
-          .findByIdAndCompanyAndType({
-            id: payload.categoryId,
-            companyId:
+          /*
+           * Moving an Expense changes both
+           * accounting periods. Lock them in
+           * deterministic order before writing.
+           */
+          await this.periodLockService
+            .validateOpenPeriods(
               expense.companyId,
-            type:
-              BillingCategoryType.EXPENSE,
-          });
+              [
+                originalDate,
+                transactionDate,
+              ],
+              manager,
+            );
 
-      if (!category) {
-        throw new ApiError(
-          400,
-          "INVALID_EXPENSE_CATEGORY",
-          "Invalid expense category",
-        );
-      }
-    }
+          if (
+            payload.categoryId !== undefined
+          ) {
+            const category =
+              await this.categoryRepository
+                .findByIdAndCompanyAndType({
+                  id: payload.categoryId,
+                  companyId:
+                    expense.companyId,
+                  type:
+                    BillingCategoryType.EXPENSE,
+                });
 
-    if (
-      payload.paymentMethodCode !==
-      undefined
-    ) {
-      const paymentMethod =
-        await this.paymentMethodRepository
-          .findByCode(
-            payload.paymentMethodCode,
+            if (!category) {
+              throw new ApiError(
+                400,
+                "INVALID_EXPENSE_CATEGORY",
+                "Invalid expense category",
+              );
+            }
+          }
+
+          if (
+            payload.paymentMethodCode !==
+            undefined
+          ) {
+            const paymentMethod =
+              await this.paymentMethodRepository
+                .findByCode(
+                  payload.paymentMethodCode,
+                );
+
+            if (!paymentMethod) {
+              throw new ApiError(
+                400,
+                "INVALID_PAYMENT_METHOD",
+                "Invalid payment method",
+              );
+            }
+          }
+
+          const normalizedPayload:
+            Partial<ExpenseEntity> = {
+            ...payload,
+          };
+
+          /*
+           * Do not assign amount: undefined during
+           * partial PATCH requests.
+           */
+          if (payload.amount !== undefined) {
+            normalizedPayload.amount =
+              Number(
+                Number(
+                  payload.amount,
+                ).toFixed(2),
+              );
+          }
+
+          /*
+           * If vendorId changes, refresh vendor
+           * snapshot fields from the real Vendor.
+           */
+          if (payload.vendorId !== undefined) {
+            const vendor =
+              await this.vendorRepository
+                .findByIdAndCompany({
+                  id: payload.vendorId,
+                  companyId:
+                    expense.companyId,
+                });
+
+            if (!vendor) {
+              throw new ApiError(
+                400,
+                "INVALID_VENDOR",
+                "Invalid vendor",
+              );
+            }
+
+            normalizedPayload.vendorName =
+              vendor.name;
+
+            normalizedPayload.vendorPublicId =
+              vendor.publicId;
+          }
+
+          const targetCasePublicId =
+            payload.casePublicId !== undefined
+              ? payload.casePublicId
+              : expense.casePublicId;
+
+          const targetAttributionType =
+            payload.attributedToType !== undefined
+              ? payload.attributedToType
+              : expense.attributedToType;
+
+          const targetAttributionPublicId =
+            payload.attributedToPublicId !==
+            undefined
+              ? payload.attributedToPublicId
+              : expense.attributedToPublicId;
+
+          const attribution =
+            await this.resolveExpenseAttribution({
+              companyId:
+                expense.companyId,
+
+              expenseDate:
+                transactionDate,
+
+              casePublicId:
+                targetCasePublicId,
+
+              attributedToType:
+                targetAttributionType,
+
+              attributedToPublicId:
+                targetAttributionPublicId,
+            });
+
+          normalizedPayload.attributedToType =
+            attribution.attributedToType;
+
+          normalizedPayload.attributedToPublicId =
+            attribution.attributedToPublicId;
+
+          normalizedPayload.attributedToName =
+            attribution.attributedToName;
+
+          Object.assign(
+            expense,
+            normalizedPayload,
           );
 
-      if (!paymentMethod) {
-        throw new ApiError(
-          400,
-          "INVALID_PAYMENT_METHOD",
-          "Invalid payment method",
-        );
-      }
-    }
+          const updatedExpense =
+            await this.expenseRepository
+              .save(
+                expense,
+                manager,
+              );
 
-    const normalizedPayload:
-      Partial<ExpenseEntity> = {
-        ...payload,
-      };
-
-    /*
-     * Do not assign amount: undefined during
-     * partial PATCH requests.
-     */
-    if (payload.amount !== undefined) {
-      normalizedPayload.amount =
-        Number(
-          Number(
-            payload.amount,
-          ).toFixed(2),
-        );
-    }
-
-    /*
-     * If vendorId changes, refresh vendor
-     * snapshot fields from the real Vendor.
-     */
-    if (payload.vendorId !== undefined) {
-      const vendor =
-        await this.vendorRepository
-          .findByIdAndCompany({
-            id: payload.vendorId,
-            companyId:
-              expense.companyId,
-          });
-
-      if (!vendor) {
-        throw new ApiError(
-          400,
-          "INVALID_VENDOR",
-          "Invalid vendor",
-        );
-      }
-
-      normalizedPayload.vendorName =
-        vendor.name;
-
-      normalizedPayload.vendorPublicId =
-        vendor.publicId;
-    }
-
-    const targetCasePublicId =
-      payload.casePublicId !== undefined
-        ? payload.casePublicId
-        : expense.casePublicId;
-
-    const targetAttributionType =
-      payload.attributedToType !== undefined
-        ? payload.attributedToType
-        : expense.attributedToType;
-
-    const targetAttributionPublicId =
-      payload.attributedToPublicId !==
-      undefined
-        ? payload.attributedToPublicId
-        : expense.attributedToPublicId;
-
-    const attribution =
-      await this.resolveExpenseAttribution({
-        companyId:
-          expense.companyId,
-
-        expenseDate:
-          transactionDate,
-
-        casePublicId:
-          targetCasePublicId,
-
-        attributedToType:
-          targetAttributionType,
-
-        attributedToPublicId:
-          targetAttributionPublicId,
-      });
-
-    normalizedPayload.attributedToType =
-      attribution.attributedToType;
-
-    normalizedPayload.attributedToPublicId =
-      attribution.attributedToPublicId;
-
-    normalizedPayload.attributedToName =
-      attribution.attributedToName;
-
-    Object.assign(
-      expense,
-      normalizedPayload,
-    );
-
-    const updatedExpense =
-      await this.expenseRepository
-        .save(expense);
+          return {
+            originalExpense,
+            updatedExpense,
+          };
+        },
+      );
 
     await this.auditLogService.log({
       companyId:
-        updatedExpense.companyId,
+        transactionResult
+          .updatedExpense
+          .companyId,
 
       companyPublicId:
-        updatedExpense.companyPublicId,
+        transactionResult
+          .updatedExpense
+          .companyPublicId,
 
       entityType:
         AuditEntityType.EXPENSE,
 
       entityId:
-        updatedExpense.id,
+        transactionResult
+          .updatedExpense
+          .id,
 
       entityPublicId:
-        updatedExpense.publicId,
+        transactionResult
+          .updatedExpense
+          .publicId,
 
       action:
         AuditAction.UPDATE,
 
       oldValues:
-        originalExpense,
+        transactionResult
+          .originalExpense,
 
       newValues:
-        updatedExpense,
+        transactionResult
+          .updatedExpense,
 
       authContext,
     });
 
-    return updatedExpense;
+    return transactionResult
+      .updatedExpense;
   }
-
   async softDelete(
     publicId: string,
     companyId: number,
     authContext?: AuthContext,
   ) {
     const expense =
-      await this.findByPublicId(
-        publicId,
-        companyId,
-      );
+      await AppDataSource.transaction(
+        async (manager) => {
+          const lockedExpense =
+            await this.expenseRepository
+              .findByPublicIdForUpdate(
+                publicId,
+                companyId,
+                manager,
+              );
 
-    await this.periodLockService
-      .validateOpenPeriod(
-        expense.companyId,
-        expense.expenseDate,
-      );
+          if (!lockedExpense) {
+            throw new ApiError(
+              404,
+              "EXPENSE_NOT_FOUND",
+              "Expense not found",
+            );
+          }
 
-    await this.expenseRepository
-      .softDeleteById(
-        expense.id,
+          await this.periodLockService
+            .validateOpenPeriod(
+              lockedExpense.companyId,
+              lockedExpense.expenseDate,
+              manager,
+            );
+
+          await this.expenseRepository
+            .softDeleteById(
+              lockedExpense.id,
+              manager,
+            );
+
+          return lockedExpense;
+        },
       );
 
     await this.auditLogService.log({
@@ -493,7 +552,6 @@ export class ExpenseService {
       deleted: true,
     };
   }
-
   private async resolveExpenseAttribution(
     params: ResolveExpenseAttributionParams,
   ) {
