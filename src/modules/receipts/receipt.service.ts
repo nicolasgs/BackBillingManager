@@ -1,8 +1,11 @@
+import { EntityManager } from "typeorm";
+
 import { AppDataSource } from "../../bootstrap/database";
 
 import { ApiError } from "../../shared/errors";
 
-import { IncomeService } from "../incomes/income.service";
+import { IncomeEntity } from "../incomes/income.entity";
+import { IncomeRepository } from "../incomes/income.repository";
 
 import { ReceiptRepository } from "./receipt.repository";
 import { ReceiptSequenceRepository } from "./receipt-sequence.repository";
@@ -12,7 +15,7 @@ export class ReceiptService {
   constructor(
     private readonly repository = new ReceiptRepository(),
     private readonly sequenceRepository = new ReceiptSequenceRepository(),
-    private readonly incomeService = new IncomeService(),
+    private readonly incomeRepository = new IncomeRepository(),
   ) {}
 
   async createForIncome(
@@ -20,10 +23,11 @@ export class ReceiptService {
     companyId: number,
     createdBy?: string,
   ) {
-    const income = await this.incomeService.findByPublicId(
-      incomePublicId,
-      companyId,
-    );
+    const income = await this.incomeRepository.findByPublicId(incomePublicId);
+
+    if (!income || income.companyId !== companyId) {
+      throw new ApiError(404, "INCOME_NOT_FOUND", "Income not found");
+    }
 
     const existing = await this.repository.findByIncomeId(income.id);
 
@@ -32,88 +36,9 @@ export class ReceiptService {
     }
 
     try {
-      return await AppDataSource.transaction(async (manager) => {
-        /*
-         * Check again inside the transaction.
-         *
-         * This protects against concurrent
-         * requests attempting to generate a
-         * receipt for the same Income.
-         */
-        const existingInsideTransaction = await this.repository.findByIncomeId(
-          income.id,
-          manager,
-        );
-
-        if (existingInsideTransaction) {
-          return existingInsideTransaction;
-        }
-
-        const issuedAt = new Date();
-
-        const year = issuedAt.getFullYear();
-
-        const nextNumber = await this.sequenceRepository.getNextNumber(
-          companyId,
-          year,
-          manager,
-        );
-
-        const receiptNumber = this.buildReceiptNumber(year, nextNumber);
-
-        const receiptEntity = this.repository.createEntity(
-          {
-            receiptNumber,
-
-            incomeId: income.id,
-
-            incomePublicId: income.publicId,
-
-            companyId: income.companyId,
-
-            companyPublicId: income.companyPublicId ?? null,
-
-            amount: Number(Number(income.amount).toFixed(2)),
-
-            currency: income.currency,
-
-            paymentDate: income.incomeDate,
-
-            description: income.description ?? null,
-
-            paymentMethodCode: income.paymentMethodCode,
-
-            referenceNumber: income.referenceNumber ?? null,
-
-            clientName: income.clientName ?? null,
-
-            caseReference: income.caseReference ?? null,
-
-            issuedAt,
-
-            createdBy: createdBy ?? null,
-
-            fileStorageProvider: null,
-
-            fileBucket: null,
-
-            fileKey: null,
-
-            fileName: null,
-
-            fileMimeType: null,
-
-            fileSize: null,
-
-            fileChecksum: null,
-
-            generatedAt: null,
-          },
-          manager,
-        );
-
-        return await this.repository.save(receiptEntity, manager);
-      });
+      return await AppDataSource.transaction(async (manager) =>
+        this.createForIncomeInTransaction(income, createdBy, manager),
+      );
     } catch (error) {
       /*
        * Final race-condition fallback.
@@ -131,6 +56,91 @@ export class ReceiptService {
 
       throw error;
     }
+  }
+
+  async createForIncomeInTransaction(
+    income: IncomeEntity,
+    createdBy: string | undefined,
+    manager: EntityManager,
+  ) {
+    /*
+     * This method intentionally does not open its
+     * own transaction. The caller owns the
+     * transaction and supplies its EntityManager.
+     */
+    const existing = await this.repository.findByIncomeId(
+      income.id,
+      manager,
+    );
+
+    if (existing) {
+      return existing;
+    }
+
+    const issuedAt = new Date();
+
+    const year = issuedAt.getFullYear();
+
+    const nextNumber = await this.sequenceRepository.getNextNumber(
+      income.companyId,
+      year,
+      manager,
+    );
+
+    const receiptNumber = this.buildReceiptNumber(year, nextNumber);
+
+    const receiptEntity = this.repository.createEntity(
+      {
+        receiptNumber,
+
+        incomeId: income.id,
+
+        incomePublicId: income.publicId,
+
+        companyId: income.companyId,
+
+        companyPublicId: income.companyPublicId ?? null,
+
+        amount: Number(Number(income.amount).toFixed(2)),
+
+        currency: income.currency,
+
+        paymentDate: income.incomeDate,
+
+        description: income.description ?? null,
+
+        paymentMethodCode: income.paymentMethodCode,
+
+        referenceNumber: income.referenceNumber ?? null,
+
+        clientName: income.clientName ?? null,
+
+        caseReference: income.caseReference ?? null,
+
+        issuedAt,
+
+        createdBy: createdBy ?? null,
+
+        fileStorageProvider: null,
+
+        fileBucket: null,
+
+        fileKey: null,
+
+        fileName: null,
+
+        fileMimeType: null,
+
+        fileSize: null,
+
+        fileChecksum: null,
+
+        generatedAt: null,
+      },
+      manager,
+    );
+
+    return await this.repository.save(receiptEntity, manager);
   }
 
   async findByPublicId(publicId: string, companyId: number) {

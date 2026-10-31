@@ -69,25 +69,6 @@ export class IncomeController {
         authContext,
       );
 
-      /*
-       * Every CRM payment Income must have a Receipt.
-       *
-       * ReceiptService.createForIncome() is idempotent:
-       * if a Receipt already exists for this Income,
-       * the existing Receipt is returned instead of
-       * creating a duplicate.
-       *
-       * Keep the API response data as the Income so
-       * existing CRM integrations remain backwards
-       * compatible and can continue reading:
-       *
-       *   response.data.publicId
-       */
-      await receiptService.createForIncome(
-        income.publicId,
-        companyId,
-        req.user?.id,
-      );
 
       return sendSuccess({
         res,

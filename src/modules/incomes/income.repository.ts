@@ -242,12 +242,19 @@ export class IncomeRepository {
       .getOne();
   }
 
-  findByExternalReference(params: {
-    companyId: number;
-    externalProvider: string;
-    externalTransactionId: string;
-  }) {
-    return this.repository.findOne({
+  findByExternalReference(
+    params: {
+      companyId: number;
+      externalProvider: string;
+      externalTransactionId: string;
+    },
+    manager?: EntityManager,
+  ) {
+    const repository = manager
+      ? manager.getRepository(IncomeEntity)
+      : this.repository;
+
+    return repository.findOne({
       where: {
         companyId: params.companyId,
 

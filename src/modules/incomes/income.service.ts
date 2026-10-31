@@ -1,3 +1,5 @@
+import type { EntityManager } from "typeorm";
+
 import { AppDataSource } from "../../bootstrap/database";
 import {
   AuditAction,
@@ -14,6 +16,7 @@ import { BillingSettingsService } from "../billing-settings/billing-settings.ser
 import { IncomeAllocationService } from "../income-allocations/income-allocation.service";
 import { PeriodLockService } from "../monthly-closings/services/period-lock.service";
 import { PaymentMethodTypeRepository } from "../payment-method-type/payment-method-type.repository";
+import { ReceiptService } from "../receipts/receipt.service";
 
 import {
   CreateCrmPaymentIncomeDto,
@@ -46,11 +49,13 @@ export class IncomeService {
 
     private readonly incomeAllocationService =
       new IncomeAllocationService(),
+
+    private readonly receiptService =
+      new ReceiptService(),
   ) {}
 
-  async create(
+  private async validateCreatePayload(
     payload: CreateIncomeDto,
-    authContext?: AuthContext,
   ) {
     const category =
       await this.categoryRepository
@@ -87,6 +92,57 @@ export class IncomeService {
         "Invalid payment method",
       );
     }
+  }
+
+  private async createInTransaction(
+    payload: CreateIncomeDto,
+    authContext: AuthContext | undefined,
+    manager: EntityManager,
+  ) {
+    const incomeEntity =
+      this.incomeRepository
+        .createEntity(
+          {
+            ...payload,
+
+            amount: Number(
+              Number(
+                payload.amount,
+              ).toFixed(2),
+            ),
+          },
+          manager,
+        );
+
+    const savedIncome =
+      await this.incomeRepository.save(
+        incomeEntity,
+        manager,
+      );
+
+    if (
+      savedIncome.status ===
+      TransactionStatus.PAID
+    ) {
+      await this.incomeAllocationService
+        .allocatePaidIncome(
+          savedIncome,
+          payload.createdBy ??
+            authContext?.userId,
+          manager,
+        );
+    }
+
+    return savedIncome;
+  }
+
+  async create(
+    payload: CreateIncomeDto,
+    authContext?: AuthContext,
+  ) {
+    await this.validateCreatePayload(
+      payload,
+    );
 
     /*
      * Income + automatic allocation are one
@@ -97,43 +153,12 @@ export class IncomeService {
      */
     const income =
       await AppDataSource.transaction(
-        async (manager) => {
-          const incomeEntity =
-            this.incomeRepository
-              .createEntity(
-                {
-                  ...payload,
-
-                  amount: Number(
-                    Number(
-                      payload.amount,
-                    ).toFixed(2),
-                  ),
-                },
-                manager,
-              );
-
-          const savedIncome =
-            await this.incomeRepository.save(
-              incomeEntity,
-              manager,
-            );
-
-          if (
-            savedIncome.status ===
-            TransactionStatus.PAID
-          ) {
-            await this.incomeAllocationService
-              .allocatePaidIncome(
-                savedIncome,
-                payload.createdBy ??
-                  authContext?.userId,
-                manager,
-              );
-          }
-
-          return savedIncome;
-        },
+        async (manager) =>
+          this.createInTransaction(
+            payload,
+            authContext,
+            manager,
+          ),
       );
 
     await this.auditLogService.log({
@@ -170,8 +195,17 @@ export class IncomeService {
     const externalTransactionId =
       `PAYMENT:${payload.paymentId}`;
 
+    const createdBy =
+      payload.createdBy ??
+      authContext?.userId ??
+      undefined;
+
     /*
-     * CRM retry idempotency.
+     * Fast idempotency path.
+     *
+     * Existing CRM Incomes may predate atomic
+     * Receipt creation, so make sure the Receipt
+     * exists before returning the Income.
      */
     const existing =
       await this.incomeRepository
@@ -182,6 +216,13 @@ export class IncomeService {
         });
 
     if (existing) {
+      await this.receiptService
+        .createForIncome(
+          existing.publicId,
+          payload.companyId,
+          createdBy,
+        );
+
       return existing;
     }
 
@@ -210,96 +251,197 @@ export class IncomeService {
       );
     }
 
+    const incomePayload: CreateIncomeDto = {
+      companyId: payload.companyId,
+
+      companyPublicId:
+        payload.companyPublicId ??
+        null,
+
+      createdBy:
+        payload.createdBy,
+
+      clientId: payload.clientId,
+
+      caseId: payload.caseId,
+
+      casePublicId:
+        payload.casePublicId,
+
+      clientName:
+        payload.clientName ?? null,
+
+      caseReference:
+        payload.caseReference ?? null,
+
+      amount: payload.amount,
+
+      currency: "USD",
+
+      incomeDate:
+        payload.paymentDate,
+
+      categoryId,
+
+      paymentMethodCode:
+        payload.paymentMethodCode,
+
+      description:
+        payload.notes
+          ? `CRM payment #${payload.paymentId}: ${payload.notes}`
+          : `CRM payment #${payload.paymentId}`,
+
+      referenceNumber:
+        payload.referenceNumber ??
+        undefined,
+
+      status:
+        TransactionStatus.PAID,
+
+      source:
+        TransactionSource.OTHER,
+
+      externalProvider,
+
+      externalTransactionId,
+    };
+
     /*
-     * CRM payments delegate to create().
-     *
-     * Because CRM payments are PAID,
-     * create() automatically generates
-     * revenue allocations in the same
-     * database transaction.
+     * Preserve the same validations previously
+     * applied through create().
      */
-    try {
-      return await this.create(
-      {
-        companyId: payload.companyId,
-
-        companyPublicId:
-          payload.companyPublicId ??
-          null,
-
-        createdBy:
-          payload.createdBy,
-
-        clientId: payload.clientId,
-
-        caseId: payload.caseId,
-
-        casePublicId:
-          payload.casePublicId,
-
-        clientName:
-          payload.clientName ?? null,
-
-        caseReference:
-          payload.caseReference ?? null,
-
-        amount: payload.amount,
-
-        currency: "USD",
-
-        incomeDate:
-          payload.paymentDate,
-
-        categoryId,
-
-        paymentMethodCode:
-          payload.paymentMethodCode,
-
-        description:
-          payload.notes
-            ? `CRM payment #${payload.paymentId}: ${payload.notes}`
-            : `CRM payment #${payload.paymentId}`,
-
-        referenceNumber:
-          payload.referenceNumber ??
-          undefined,
-
-        status:
-          TransactionStatus.PAID,
-
-        source:
-          TransactionSource.OTHER,
-
-        externalProvider,
-
-        externalTransactionId,
-      },
-
-      authContext,
+    await this.validateCreatePayload(
+      incomePayload,
     );
+
+    let transactionResult: {
+      income: IncomeEntity;
+      created: boolean;
+    };
+
+    try {
+      transactionResult =
+        await AppDataSource.transaction(
+          async (manager) => {
+            /*
+             * Re-check idempotency inside the
+             * transaction in case another request
+             * committed after the fast-path check.
+             */
+            const existingInsideTransaction =
+              await this.incomeRepository
+                .findByExternalReference(
+                  {
+                    companyId:
+                      payload.companyId,
+                    externalProvider,
+                    externalTransactionId,
+                  },
+                  manager,
+                );
+
+            if (existingInsideTransaction) {
+              await this.receiptService
+                .createForIncomeInTransaction(
+                  existingInsideTransaction,
+                  createdBy,
+                  manager,
+                );
+
+              return {
+                income:
+                  existingInsideTransaction,
+                created: false,
+              };
+            }
+
+            const createdIncome =
+              await this.createInTransaction(
+                incomePayload,
+                authContext,
+                manager,
+              );
+
+            /*
+             * Income, allocations, Receipt and
+             * receipt sequence now commit or roll
+             * back together.
+             */
+            await this.receiptService
+              .createForIncomeInTransaction(
+                createdIncome,
+                createdBy,
+                manager,
+              );
+
+            return {
+              income: createdIncome,
+              created: true,
+            };
+          },
+        );
     } catch (error: any) {
       /*
-       * The database unique index is the final
-       * idempotency guard for concurrent CRM retries.
+       * The database unique index remains the
+       * final idempotency guard for concurrent
+       * CRM retries.
        */
       if (error?.code === "23505") {
         const concurrentExisting =
           await this.incomeRepository
             .findByExternalReference({
-              companyId: payload.companyId,
+              companyId:
+                payload.companyId,
               externalProvider,
               externalTransactionId,
             });
 
         if (concurrentExisting) {
+          await this.receiptService
+            .createForIncome(
+              concurrentExisting.publicId,
+              payload.companyId,
+              createdBy,
+            );
+
           return concurrentExisting;
         }
       }
 
       throw error;
     }
-  }
 
+    /*
+     * Keep audit behavior outside the accounting
+     * transaction, matching normal Income creation.
+     * Do not create a second audit entry for an
+     * idempotent retry.
+     */
+    if (transactionResult.created) {
+      const income =
+        transactionResult.income;
+
+      await this.auditLogService.log({
+        companyId: income.companyId,
+        companyPublicId:
+          income.companyPublicId,
+
+        entityType:
+          AuditEntityType.INCOME,
+        entityId: income.id,
+        entityPublicId:
+          income.publicId,
+
+        action: AuditAction.CREATE,
+
+        newValues: income,
+
+        authContext,
+      });
+    }
+
+    return transactionResult.income;
+  }
   async findAll(
     filters: IncomeFilters,
   ) {
