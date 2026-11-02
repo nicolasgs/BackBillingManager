@@ -12,12 +12,37 @@ export class RevenueAgreementRepository {
   private repository =
     AppDataSource.getRepository(RevenueAgreementEntity);
 
-  createEntity(payload: Partial<RevenueAgreementEntity>) {
-    return this.repository.create(payload);
+  private getRepository(manager?: EntityManager) {
+    return manager
+      ? manager.getRepository(RevenueAgreementEntity)
+      : this.repository;
   }
 
-  save(entity: RevenueAgreementEntity) {
-    return this.repository.save(entity);
+  createEntity(
+    payload: Partial<RevenueAgreementEntity>,
+    manager?: EntityManager,
+  ) {
+    return this.getRepository(manager).create(payload);
+  }
+
+  save(
+    entity: RevenueAgreementEntity,
+    manager?: EntityManager,
+  ) {
+    return this.getRepository(manager).save(entity);
+  }
+
+  async lockCase(
+    companyId: number,
+    casePublicId: string,
+    manager: EntityManager,
+  ) {
+    await manager.query(
+      "SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))",
+      [
+        `revenue-agreement-case:${companyId}:${casePublicId}`,
+      ],
+    );
   }
 
   findByPublicId(publicId: string) {
@@ -29,13 +54,35 @@ export class RevenueAgreementRepository {
     });
   }
 
-  findActiveForParticipant(params: {
-    companyId: number;
-    casePublicId: string;
-    participantType: RevenueParticipantType;
-    participantPublicId: string;
-  }) {
-    return this.repository.findOne({
+  findByPublicIdForUpdate(
+    publicId: string,
+    companyId: number,
+    manager: EntityManager,
+  ) {
+    return manager
+      .getRepository(RevenueAgreementEntity)
+      .createQueryBuilder("agreement")
+      .where("agreement.publicId = :publicId", {
+        publicId,
+      })
+      .andWhere("agreement.companyId = :companyId", {
+        companyId,
+      })
+      .andWhere("agreement.deletedAt IS NULL")
+      .setLock("pessimistic_write")
+      .getOne();
+  }
+
+  findActiveForParticipant(
+    params: {
+      companyId: number;
+      casePublicId: string;
+      participantType: RevenueParticipantType;
+      participantPublicId: string;
+    },
+    manager?: EntityManager,
+  ) {
+    return this.getRepository(manager).findOne({
       where: {
         companyId: params.companyId,
         casePublicId: params.casePublicId,
@@ -47,14 +94,17 @@ export class RevenueAgreementRepository {
     });
   }
 
-  async findOverlappingForParticipant(params: {
-    companyId: number;
-    casePublicId: string;
-    participantType: RevenueParticipantType;
-    participantPublicId: string;
-    effectiveFrom: string;
-  }) {
-    return this.repository
+  async findOverlappingForParticipant(
+    params: {
+      companyId: number;
+      casePublicId: string;
+      participantType: RevenueParticipantType;
+      participantPublicId: string;
+      effectiveFrom: string;
+    },
+    manager?: EntityManager,
+  ) {
+    return this.getRepository(manager)
       .createQueryBuilder("agreement")
       .where(
         "agreement.companyId = :companyId",
@@ -95,12 +145,15 @@ export class RevenueAgreementRepository {
       .getOne();
   }
 
-  async sumOverlappingPercentages(params: {
-    companyId: number;
-    casePublicId: string;
-    effectiveFrom: string;
-  }): Promise<number> {
-    const result = await this.repository
+  async sumOverlappingPercentages(
+    params: {
+      companyId: number;
+      casePublicId: string;
+      effectiveFrom: string;
+    },
+    manager?: EntityManager,
+  ): Promise<number> {
+    const result = await this.getRepository(manager)
       .createQueryBuilder("agreement")
       .select(
         "COALESCE(SUM(agreement.percentage), 0)",
@@ -184,8 +237,11 @@ export class RevenueAgreementRepository {
       .setLock("pessimistic_write")
       .getMany();
   }
-  async findAll(filters: RevenueAgreementFilters) {
-    const query = this.repository
+  async findAll(
+    filters: RevenueAgreementFilters,
+    manager?: EntityManager,
+  ) {
+    const query = this.getRepository(manager)
       .createQueryBuilder("agreement")
       .where(
         "agreement.companyId = :companyId",

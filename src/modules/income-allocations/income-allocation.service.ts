@@ -75,6 +75,19 @@ export class IncomeAllocationService {
     let agreements: RevenueAgreementEntity[] = [];
 
     if (income.casePublicId) {
+      /*
+       * Keep the effective Revenue Agreement set stable
+       * while this Income allocation snapshot is built.
+       *
+       * Revenue Agreement create/end operations use the
+       * same tenant + Case advisory lock.
+       */
+      await this.revenueAgreementRepository.lockCase(
+        income.companyId,
+        income.casePublicId,
+        manager,
+      );
+
       agreements =
         await this.revenueAgreementRepository.findEffectiveForCase(
           {

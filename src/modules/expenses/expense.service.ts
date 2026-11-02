@@ -1,3 +1,5 @@
+import { EntityManager } from "typeorm";
+
 import { AppDataSource } from "../../bootstrap/database";
 import { ApiError } from "../../shared/errors";
 import {
@@ -118,25 +120,6 @@ export class ExpenseService {
         vendor.publicId;
     }
 
-    const attribution =
-      await this.resolveExpenseAttribution({
-        companyId: payload.companyId,
-
-        expenseDate:
-          payload.expenseDate,
-
-        casePublicId:
-          payload.casePublicId ?? null,
-
-        attributedToType:
-          payload.attributedToType ??
-          RevenueOwnerType.TENANT,
-
-        attributedToPublicId:
-          payload.attributedToPublicId ??
-          null,
-      });
-
     const expense =
       await AppDataSource.transaction(
         async (manager) => {
@@ -144,6 +127,29 @@ export class ExpenseService {
             .validateOpenPeriod(
               payload.companyId,
               payload.expenseDate,
+              manager,
+            );
+
+          const attribution =
+            await this.resolveExpenseAttribution(
+              {
+                companyId:
+                  payload.companyId,
+
+                expenseDate:
+                  payload.expenseDate,
+
+                casePublicId:
+                  payload.casePublicId ?? null,
+
+                attributedToType:
+                  payload.attributedToType ??
+                  RevenueOwnerType.TENANT,
+
+                attributedToPublicId:
+                  payload.attributedToPublicId ??
+                  null,
+              },
               manager,
             );
 
@@ -393,22 +399,25 @@ export class ExpenseService {
               : expense.attributedToPublicId;
 
           const attribution =
-            await this.resolveExpenseAttribution({
-              companyId:
-                expense.companyId,
+            await this.resolveExpenseAttribution(
+              {
+                companyId:
+                  expense.companyId,
 
-              expenseDate:
-                transactionDate,
+                expenseDate:
+                  transactionDate,
 
-              casePublicId:
-                targetCasePublicId,
+                casePublicId:
+                  targetCasePublicId,
 
-              attributedToType:
-                targetAttributionType,
+                attributedToType:
+                  targetAttributionType,
 
-              attributedToPublicId:
-                targetAttributionPublicId,
-            });
+                attributedToPublicId:
+                  targetAttributionPublicId,
+              },
+              manager,
+            );
 
           normalizedPayload.attributedToType =
             attribution.attributedToType;
@@ -554,6 +563,7 @@ export class ExpenseService {
   }
   private async resolveExpenseAttribution(
     params: ResolveExpenseAttributionParams,
+    manager: EntityManager,
   ) {
     const attributedToType =
       params.attributedToType ??
@@ -609,20 +619,36 @@ export class ExpenseService {
      * Agreements, so the frontend cannot invent
      * participant names.
      */
+    /*
+     * Keep the Revenue Agreement set stable from
+     * attribution validation through Expense commit.
+     *
+     * Tenant attribution returned above does not
+     * require a Case lock.
+     */
+    await this.revenueAgreementRepository.lockCase(
+      params.companyId,
+      params.casePublicId,
+      manager,
+    );
+
     const agreements =
       await this.revenueAgreementRepository
-        .findAll({
-          companyId:
-            params.companyId,
+        .findAll(
+          {
+            companyId:
+              params.companyId,
 
-          casePublicId:
-            params.casePublicId,
+            casePublicId:
+              params.casePublicId,
 
-          participantType,
+            participantType,
 
-          participantPublicId:
-            params.attributedToPublicId,
-        });
+            participantPublicId:
+              params.attributedToPublicId,
+          },
+          manager,
+        );
 
     /*
      * The participant must have an agreement
