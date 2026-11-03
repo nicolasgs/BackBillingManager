@@ -85,6 +85,37 @@ export class ParticipantSettlementRepository {
     };
   }
 
+  findPayoutByExternalReference(
+    params: {
+      companyId: number;
+      externalProvider: string;
+      externalTransactionId: string;
+    },
+    manager?: EntityManager,
+  ) {
+    const repository = manager
+      ? manager.getRepository(
+          ParticipantPayoutEntity,
+        )
+      : AppDataSource.getRepository(
+          ParticipantPayoutEntity,
+        );
+
+    return repository.findOne({
+      where: {
+        companyId: params.companyId,
+
+        externalProvider:
+          params.externalProvider,
+
+        externalTransactionId:
+          params.externalTransactionId,
+
+        deletedAt: IsNull(),
+      },
+    });
+  }
+
   async findAll(
     filters: ParticipantSettlementFilters,
   ) {
@@ -589,8 +620,16 @@ export class ParticipantSettlementRepository {
     companyId: number,
     createdBy: string,
   ): Promise<CreatePayoutResult> {
-    return AppDataSource.transaction(
-      async (manager) => {
+    const normalizedProvider =
+      payload.externalProvider ??
+      null;
+
+    const normalizedTransactionId =
+      payload.externalTransactionId ??
+      null;
+
+    try {
+      return await AppDataSource.transaction(async (manager) => {
         const settlementRepository =
           manager.getRepository(
             ParticipantSettlementEntity,
@@ -627,14 +666,6 @@ export class ParticipantSettlementRepository {
           );
         }
 
-        const normalizedProvider =
-          payload.externalProvider ??
-          null;
-
-        const normalizedTransactionId =
-          payload.externalTransactionId ??
-          null;
-
         /*
          * External transaction idempotency is
          * checked before all mutable balance
@@ -645,16 +676,16 @@ export class ParticipantSettlementRepository {
           normalizedTransactionId
         ) {
           const existing =
-            await payoutRepository.findOne({
-              where: {
+            await this.findPayoutByExternalReference(
+              {
                 companyId,
                 externalProvider:
                   normalizedProvider,
                 externalTransactionId:
                   normalizedTransactionId,
-                deletedAt: IsNull(),
               },
-            });
+              manager,
+            );
 
           if (existing) {
             const sameFinancialRequest =
@@ -839,8 +870,82 @@ export class ParticipantSettlementRepository {
           created: true,
           settlementBefore,
         };
-      },
-    );
+      });
+    } catch (error: any) {
+      /*
+       * The database unique index is the final
+       * idempotency guard for concurrent payout
+       * requests that target different settlements.
+       */
+      if (
+        error?.code === "23505" &&
+        error?.constraint ===
+          "uq_participant_payout_external_transaction" &&
+        normalizedProvider &&
+        normalizedTransactionId
+      ) {
+        const concurrentExisting =
+          await this.findPayoutByExternalReference({
+            companyId,
+            externalProvider:
+              normalizedProvider,
+            externalTransactionId:
+              normalizedTransactionId,
+          });
+
+        const settlement =
+          await this.settlementRepository.findOne({
+            where: {
+              publicId:
+                settlementPublicId,
+              companyId,
+              deletedAt: IsNull(),
+            },
+          });
+
+        if (
+          concurrentExisting &&
+          settlement
+        ) {
+          const sameFinancialRequest =
+            concurrentExisting.settlementId ===
+              settlement.id &&
+            toCents(
+              concurrentExisting.amount,
+            ) ===
+              toCents(
+                payload.amount,
+              ) &&
+            concurrentExisting.currency ===
+              payload.currency &&
+            concurrentExisting.payoutDate ===
+              payload.payoutDate &&
+            concurrentExisting.paymentMethodCode ===
+              payload.paymentMethodCode;
+
+          if (!sameFinancialRequest) {
+            throw new ApiError(
+              409,
+              "PARTICIPANT_PAYOUT_IDEMPOTENCY_CONFLICT",
+              "The external transaction ID is already associated with a different payout request",
+            );
+          }
+
+          return {
+            settlement,
+            payout:
+              concurrentExisting,
+            created: false,
+            settlementBefore:
+              this.snapshotSettlement(
+                settlement,
+              ),
+          };
+        }
+      }
+
+      throw error;
+    }
   }
 
   async voidPayout(
