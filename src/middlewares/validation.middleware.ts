@@ -21,5 +21,18 @@ export const validate =
         req.body = result.data
         }
 
+        if (target === 'params') {
+        req.params = result.data as Request['params']
+        }
+
+        if (target === 'query') {
+        Object.defineProperty(req, 'query', {
+            configurable: true,
+            enumerable: true,
+            writable: true,
+            value: result.data,
+        })
+        }
+
         return next()
 }
