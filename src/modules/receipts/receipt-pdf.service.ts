@@ -148,3 +148,6 @@ export class ReceiptPdfService {
     }).format(value);
   }
 }
+
+export const receiptPdfService =
+  new ReceiptPdfService();

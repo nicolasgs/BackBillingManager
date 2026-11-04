@@ -3,10 +3,9 @@ import type { NextFunction, Request, Response } from "express";
 import { sendSuccess } from "../../shared/responses";
 
 import { ReceiptService } from "./receipt.service";
-import { ReceiptPdfService } from "./receipt-pdf.service";
+import { receiptPdfService } from "./receipt-pdf.service";
 
 const service = new ReceiptService();
-const pdfService = new ReceiptPdfService();
 
 export class ReceiptController {
   findOne = async (req: Request, res: Response, next: NextFunction) => {
@@ -61,7 +60,7 @@ export class ReceiptController {
 
       const receipt = await service.findByPublicId(publicId, companyId);
 
-      const pdf = await pdfService.generate(receipt);
+      const pdf = await receiptPdfService.generate(receipt);
 
       const fileName = `${receipt.receiptNumber}.pdf`;
 
