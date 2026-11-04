@@ -338,13 +338,6 @@ export class IncomeService {
                 );
 
             if (existingInsideTransaction) {
-              await this.receiptService
-                .createForIncomeInTransaction(
-                  existingInsideTransaction,
-                  createdBy,
-                  manager,
-                );
-
               return {
                 income:
                   existingInsideTransaction,
@@ -382,13 +375,6 @@ export class IncomeService {
                 );
 
             if (existingAfterPeriodLock) {
-              await this.receiptService
-                .createForIncomeInTransaction(
-                  existingAfterPeriodLock,
-                  createdBy,
-                  manager,
-                );
-
               return {
                 income:
                   existingAfterPeriodLock,
@@ -455,6 +441,24 @@ export class IncomeService {
       }
 
       throw error;
+    }
+
+    /*
+     * Existing CRM retries must issue/verify the
+     * Receipt only after the retry transaction has
+     * released any accounting-period lock.
+     *
+     * createForIncome() then serializes Receipt
+     * issuance with Income update/delete by locking
+     * the current Income row.
+     */
+    if (!transactionResult.created) {
+      await this.receiptService
+        .createForIncome(
+          transactionResult.income.publicId,
+          payload.companyId,
+          createdBy,
+        );
     }
 
     /*
@@ -599,6 +603,20 @@ export class IncomeService {
             );
           }
 
+          const hasReceipt =
+            await this.receiptService
+              .hasReceiptForIncome(
+                Number(income.id),
+                manager,
+              );
+
+          if (hasReceipt) {
+            this.assertReceiptedIncomeMutationAllowed(
+              income,
+              normalizedPayload,
+            );
+          }
+
           const previousStatus =
             income.status;
 
@@ -736,6 +754,21 @@ export class IncomeService {
             );
           }
 
+          const hasReceipt =
+            await this.receiptService
+              .hasReceiptForIncome(
+                Number(lockedIncome.id),
+                manager,
+              );
+
+          if (hasReceipt) {
+            throw new ApiError(
+              409,
+              "RECEIPTED_INCOME_CANNOT_BE_DELETED",
+              "An income with an issued receipt cannot be deleted. Use a dedicated reversal workflow instead.",
+            );
+          }
+
           await this.incomeRepository
             .softDeleteById(
               Number(
@@ -772,6 +805,136 @@ export class IncomeService {
       publicId: income.publicId,
       deleted: true,
     };
+  }
+
+  /*
+   * Preserve the immutable Receipt snapshot and
+   * the identity/provenance of the receipted Income.
+   * Internal classifications not represented by
+   * the Receipt may still be edited.
+   */
+  private assertReceiptedIncomeMutationAllowed(
+    income: IncomeEntity,
+    payload: UpdateIncomeDto,
+  ) {
+    const amountChanged =
+      payload.amount !== undefined &&
+      Number(payload.amount) !==
+        Number(income.amount);
+
+    const currencyChanged =
+      payload.currency !== undefined &&
+      payload.currency !==
+        income.currency;
+
+    const dateChanged =
+      payload.incomeDate !== undefined &&
+      payload.incomeDate !==
+        income.incomeDate;
+
+    const paymentMethodChanged =
+      payload.paymentMethodCode !==
+        undefined &&
+      payload.paymentMethodCode !==
+        income.paymentMethodCode;
+
+    const descriptionChanged =
+      payload.description !== undefined &&
+      payload.description !==
+        income.description;
+
+    const referenceChanged =
+      payload.referenceNumber !==
+        undefined &&
+      payload.referenceNumber !==
+        income.referenceNumber;
+
+    const clientNameChanged =
+      payload.clientName !== undefined &&
+      payload.clientName !==
+        income.clientName;
+
+    const caseReferenceChanged =
+      payload.caseReference !==
+        undefined &&
+      payload.caseReference !==
+        income.caseReference;
+
+    const companyPublicIdChanged =
+      payload.companyPublicId !==
+        undefined &&
+      payload.companyPublicId !==
+        income.companyPublicId;
+
+    const clientIdChanged =
+      payload.clientId !== undefined &&
+      Number(payload.clientId) !==
+        Number(income.clientId);
+
+    const clientPublicIdChanged =
+      payload.clientPublicId !==
+        undefined &&
+      payload.clientPublicId !==
+        income.clientPublicId;
+
+    const caseIdChanged =
+      payload.caseId !== undefined &&
+      Number(payload.caseId) !==
+        Number(income.caseId);
+
+    const casePublicIdChanged =
+      payload.casePublicId !==
+        undefined &&
+      payload.casePublicId !==
+        income.casePublicId;
+
+    const statusChanged =
+      payload.status !== undefined &&
+      payload.status !==
+        income.status;
+
+    const sourceChanged =
+      payload.source !== undefined &&
+      payload.source !==
+        income.source;
+
+    const providerChanged =
+      payload.externalProvider !==
+        undefined &&
+      payload.externalProvider !==
+        income.externalProvider;
+
+    const transactionIdChanged =
+      payload.externalTransactionId !==
+        undefined &&
+      payload.externalTransactionId !==
+        income.externalTransactionId;
+
+    if (
+      amountChanged ||
+      currencyChanged ||
+      dateChanged ||
+      paymentMethodChanged ||
+      descriptionChanged ||
+      referenceChanged ||
+      clientNameChanged ||
+      caseReferenceChanged ||
+      companyPublicIdChanged ||
+      clientIdChanged ||
+      clientPublicIdChanged ||
+      caseIdChanged ||
+      casePublicIdChanged ||
+      statusChanged ||
+      sourceChanged ||
+      providerChanged ||
+      transactionIdChanged
+    ) {
+      throw new ApiError(
+        409,
+        "RECEIPTED_INCOME_SNAPSHOT_IMMUTABLE",
+        "Receipt-protected income fields and transaction identity cannot be changed.",
+      );
+    }
   }
 
   /*

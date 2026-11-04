@@ -2,6 +2,7 @@ import { EntityManager } from "typeorm";
 
 import { AppDataSource } from "../../bootstrap/database";
 
+import { TransactionStatus } from "../../shared/enums";
 import { ApiError } from "../../shared/errors";
 
 import { IncomeEntity } from "../incomes/income.entity";
@@ -36,8 +37,36 @@ export class ReceiptService {
     }
 
     try {
-      return await AppDataSource.transaction(async (manager) =>
-        this.createForIncomeInTransaction(income, createdBy, manager),
+      return await AppDataSource.transaction(
+        async (manager) => {
+          /*
+           * Serialize Receipt issuance with Income
+           * update/delete operations. Build the
+           * immutable Receipt snapshot from the
+           * locked, current Income state.
+           */
+          const lockedIncome =
+            await this.incomeRepository
+              .findByPublicIdForUpdate(
+                incomePublicId,
+                companyId,
+                manager,
+              );
+
+          if (!lockedIncome) {
+            throw new ApiError(
+              404,
+              "INCOME_NOT_FOUND",
+              "Income not found",
+            );
+          }
+
+          return this.createForIncomeInTransaction(
+            lockedIncome,
+            createdBy,
+            manager,
+          );
+        },
       );
     } catch (error: any) {
       /*
@@ -83,6 +112,17 @@ export class ReceiptService {
 
     if (existing) {
       return existing;
+    }
+
+    if (
+      income.status !==
+      TransactionStatus.PAID
+    ) {
+      throw new ApiError(
+        409,
+        "RECEIPT_REQUIRES_PAID_INCOME",
+        "A receipt can only be issued for a paid income.",
+      );
     }
 
     const issuedAt = new Date();
@@ -149,6 +189,19 @@ export class ReceiptService {
     );
 
     return await this.repository.save(receiptEntity, manager);
+  }
+
+  async hasReceiptForIncome(
+    incomeId: number,
+    manager: EntityManager,
+  ): Promise<boolean> {
+    const receipt =
+      await this.repository.findByIncomeId(
+        incomeId,
+        manager,
+      );
+
+    return Boolean(receipt);
   }
 
   async findByPublicId(publicId: string, companyId: number) {
