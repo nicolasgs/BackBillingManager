@@ -1,4 +1,4 @@
-import { IsNull } from 'typeorm'
+import { EntityManager, IsNull } from 'typeorm'
 import { AppDataSource } from '../../bootstrap/database'
 import { BillingCategoryType } from '../../shared/enums'
 import { BillingCategoryEntity } from './billing-category.entity'
@@ -81,6 +81,31 @@ export class BillingCategoryRepository {
             deletedAt: IsNull(),
         },
         })
+    }
+
+    findByIdAndCompanyAndTypeForUpdate(
+        params: {
+            id: number
+            companyId: number
+            type: BillingCategoryType
+        },
+        manager: EntityManager
+    ) {
+        return manager
+        .getRepository(BillingCategoryEntity)
+        .createQueryBuilder('category')
+        .where('category.id = :id', {
+            id: params.id,
+        })
+        .andWhere('category.companyId = :companyId', {
+            companyId: params.companyId,
+        })
+        .andWhere('category.type = :type', {
+            type: params.type,
+        })
+        .andWhere('category.deletedAt IS NULL')
+        .setLock('pessimistic_write')
+        .getOne()
     }
 
     softDeleteById(id: number) {

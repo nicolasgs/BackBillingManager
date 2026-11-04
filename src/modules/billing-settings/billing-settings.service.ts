@@ -1,3 +1,5 @@
+import { AppDataSource } from "../../bootstrap/database";
+
 import { ApiError } from "../../shared/errors";
 
 import { BillingCategoryType } from "../../shared/enums";
@@ -26,52 +28,83 @@ export class BillingSettingsService {
       createdBy?: string;
     },
   ) {
-    if (payload.crmPaymentIncomeCategoryId !== null) {
-      const category = await this.categoryRepository.findByIdAndCompanyAndType({
-        id: payload.crmPaymentIncomeCategoryId,
-
-        companyId: payload.companyId,
-
-        type: BillingCategoryType.INCOME,
-      });
-
-      if (!category) {
-        throw new ApiError(
-          400,
-          "INVALID_CRM_PAYMENT_INCOME_CATEGORY",
-          "The selected CRM payment income category is invalid.",
+    return AppDataSource.transaction(
+      async (manager) => {
+        await this.repository.lockCompany(
+          payload.companyId,
+          manager,
         );
-      }
 
-      if (!category.isActive) {
-        throw new ApiError(
-          400,
-          "INACTIVE_CRM_PAYMENT_INCOME_CATEGORY",
-          "The selected CRM payment income category is inactive.",
+        if (payload.crmPaymentIncomeCategoryId !== null) {
+          const category =
+            await this.categoryRepository
+              .findByIdAndCompanyAndTypeForUpdate(
+                {
+                  id:
+                    payload.crmPaymentIncomeCategoryId,
+
+                  companyId:
+                    payload.companyId,
+
+                  type:
+                    BillingCategoryType.INCOME,
+                },
+                manager,
+              );
+
+          if (!category) {
+            throw new ApiError(
+              400,
+              "INVALID_CRM_PAYMENT_INCOME_CATEGORY",
+              "The selected CRM payment income category is invalid.",
+            );
+          }
+
+          if (!category.isActive) {
+            throw new ApiError(
+              400,
+              "INACTIVE_CRM_PAYMENT_INCOME_CATEGORY",
+              "The selected CRM payment income category is inactive.",
+            );
+          }
+        }
+
+        let settings =
+          await this.repository.findByCompanyId(
+            payload.companyId,
+            manager,
+          );
+
+        if (!settings) {
+          settings = this.repository.createEntity(
+            {
+              companyId: payload.companyId,
+
+              companyPublicId:
+                payload.companyPublicId ?? null,
+
+              createdBy: payload.createdBy,
+
+              crmPaymentIncomeCategoryId:
+                payload.crmPaymentIncomeCategoryId,
+            },
+            manager,
+          );
+        } else {
+          settings.crmPaymentIncomeCategoryId =
+            payload.crmPaymentIncomeCategoryId;
+
+          if (payload.companyPublicId !== undefined) {
+            settings.companyPublicId =
+              payload.companyPublicId;
+          }
+        }
+
+        return this.repository.save(
+          settings,
+          manager,
         );
-      }
-    }
-
-    let settings = await this.repository.findByCompanyId(payload.companyId);
-
-    if (!settings) {
-      settings = this.repository.createEntity({
-        companyId: payload.companyId,
-
-        companyPublicId: payload.companyPublicId ?? null,
-
-        createdBy: payload.createdBy,
-
-        crmPaymentIncomeCategoryId: payload.crmPaymentIncomeCategoryId,
-      });
-    } else {
-      settings.crmPaymentIncomeCategoryId = payload.crmPaymentIncomeCategoryId;
-
-      if (payload.companyPublicId !== undefined) {
-        settings.companyPublicId = payload.companyPublicId;
-      }
-    }
-
-    return this.repository.save(settings);
+      },
+    );
   }
 }
