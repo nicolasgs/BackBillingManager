@@ -5,6 +5,8 @@ export class PdfGenerator {
 
   private browserLaunchPromise?: Promise<Browser>;
 
+  private closed = false;
+
   async generateFromHtml(
     html: string,
     options: PDFOptions = {},
@@ -35,6 +37,22 @@ export class PdfGenerator {
   }
 
   async close(): Promise<void> {
+    this.closed = true;
+
+    const launchPromise =
+      this.browserLaunchPromise;
+
+    if (launchPromise) {
+      try {
+        await launchPromise;
+      } catch {
+        /*
+         * A failed launch leaves no Browser to close.
+         * Shutdown should still continue.
+         */
+      }
+    }
+
     await this.disposeBrowser();
   }
 
@@ -80,6 +98,12 @@ export class PdfGenerator {
   }
 
   private async getBrowser(): Promise<Browser> {
+    if (this.closed) {
+      throw new Error(
+        "PdfGenerator is closed",
+      );
+    }
+
     if (this.browser?.connected) {
       return this.browser;
     }
@@ -99,7 +123,16 @@ export class PdfGenerator {
       this.browserLaunchPromise;
 
     try {
-      return await launchPromise;
+      const browser =
+        await launchPromise;
+
+      if (this.closed) {
+        throw new Error(
+          "PdfGenerator is closed",
+        );
+      }
+
+      return browser;
     } finally {
       if (
         this.browserLaunchPromise ===
