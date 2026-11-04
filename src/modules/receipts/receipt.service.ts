@@ -39,19 +39,27 @@ export class ReceiptService {
       return await AppDataSource.transaction(async (manager) =>
         this.createForIncomeInTransaction(income, createdBy, manager),
       );
-    } catch (error) {
+    } catch (error: any) {
       /*
        * Final race-condition fallback.
        *
-       * The database UNIQUE constraint on
-       * income_id is still the ultimate
-       * protection. If another request won
-       * the race, return that Receipt.
+       * Recover only the expected concurrent
+       * duplicate Receipt for this Income.
+       * Unrelated database errors must propagate.
        */
-      const concurrentReceipt = await this.repository.findByIncomeId(income.id);
+      if (
+        error?.code === "23505" &&
+        error?.constraint ===
+          "uq_receipts_income_id"
+      ) {
+        const concurrentReceipt =
+          await this.repository.findByIncomeId(
+            income.id,
+          );
 
-      if (concurrentReceipt) {
-        return concurrentReceipt;
+        if (concurrentReceipt) {
+          return concurrentReceipt;
+        }
       }
 
       throw error;
