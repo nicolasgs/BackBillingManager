@@ -3,6 +3,8 @@
 export class PdfGenerator {
   private browser?: Browser;
 
+  private browserLaunchPromise?: Promise<Browser>;
+
   async generateFromHtml(
     html: string,
     options: PDFOptions = {},
@@ -82,6 +84,34 @@ export class PdfGenerator {
       return this.browser;
     }
 
+    /*
+     * Several PDF requests can arrive before Chromium has
+     * finished launching. Share one launch Promise so those
+     * requests cannot create separate orphaned Browser
+     * processes.
+     */
+    if (!this.browserLaunchPromise) {
+      this.browserLaunchPromise =
+        this.launchBrowser();
+    }
+
+    const launchPromise =
+      this.browserLaunchPromise;
+
+    try {
+      return await launchPromise;
+    } finally {
+      if (
+        this.browserLaunchPromise ===
+        launchPromise
+      ) {
+        this.browserLaunchPromise =
+          undefined;
+      }
+    }
+  }
+
+  private async launchBrowser(): Promise<Browser> {
     await this.disposeBrowser();
 
     const browser = await puppeteer.launch({
