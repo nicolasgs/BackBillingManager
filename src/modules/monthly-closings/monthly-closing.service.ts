@@ -43,7 +43,25 @@ export class MonthlyClosingService {
       netAmount: 0,
     });
 
-    const closing = await this.repository.save(closingEntity);
+    let closing;
+
+    try {
+      closing = await this.repository.save(closingEntity);
+    } catch (error: any) {
+      if (
+        error?.code === "23505" &&
+        error?.constraint ===
+          "uq_monthly_closings_company_period"
+      ) {
+        throw new ApiError(
+          409,
+          "MONTHLY_CLOSING_ALREADY_EXISTS",
+          "Monthly closing already exists for this company and period",
+        );
+      }
+
+      throw error;
+    }
 
     await this.auditLogService.log({
       companyId: closing.companyId,
