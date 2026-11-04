@@ -62,22 +62,6 @@ export class ExpenseService {
     payload: CreateExpenseDto,
     authContext?: AuthContext,
   ) {
-    const category =
-      await this.categoryRepository
-        .findByIdAndCompanyAndType({
-          id: payload.categoryId,
-          companyId: payload.companyId,
-          type: BillingCategoryType.EXPENSE,
-        });
-
-
-    if (!category) {
-      throw new ApiError(
-        400,
-        "INVALID_EXPENSE_CATEGORY",
-        "Invalid expense category",
-      );
-    }
 
     const paymentMethod =
       await this.paymentMethodRepository
@@ -129,6 +113,25 @@ export class ExpenseService {
               payload.expenseDate,
               manager,
             );
+
+          const category =
+            await this.categoryRepository
+              .findActiveByIdAndCompanyAndTypeForUpdate(
+                {
+                  id: payload.categoryId,
+                  companyId: payload.companyId,
+                  type: BillingCategoryType.EXPENSE,
+                },
+                manager,
+              );
+
+          if (!category) {
+            throw new ApiError(
+              400,
+              "INVALID_EXPENSE_CATEGORY",
+              "Invalid expense category",
+            );
+          }
 
           const attribution =
             await this.resolveExpenseAttribution(
@@ -298,15 +301,33 @@ export class ExpenseService {
           if (
             payload.categoryId !== undefined
           ) {
-            const category =
-              await this.categoryRepository
-                .findByIdAndCompanyAndType({
-                  id: payload.categoryId,
-                  companyId:
-                    expense.companyId,
-                  type:
-                    BillingCategoryType.EXPENSE,
-                });
+            const categoryChanged =
+              Number(payload.categoryId) !==
+              Number(expense.categoryId);
+
+            const category = categoryChanged
+              ? await this.categoryRepository
+                  .findActiveByIdAndCompanyAndTypeForUpdate(
+                    {
+                      id: payload.categoryId,
+                      companyId:
+                        expense.companyId,
+                      type:
+                        BillingCategoryType.EXPENSE,
+                    },
+                    manager,
+                  )
+              : await this.categoryRepository
+                  .findByIdAndCompanyAndTypeForUpdate(
+                    {
+                      id: payload.categoryId,
+                      companyId:
+                        expense.companyId,
+                      type:
+                        BillingCategoryType.EXPENSE,
+                    },
+                    manager,
+                  );
 
             if (!category) {
               throw new ApiError(

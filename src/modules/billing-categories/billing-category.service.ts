@@ -1,3 +1,4 @@
+import { AppDataSource } from '../../bootstrap/database'
 import { AuditAction, AuditEntityType } from '../../shared/enums'
 import { ApiError } from '../../shared/errors'
 import { AuditLogService } from '../audit-logs/audit-log.service'
@@ -19,22 +20,51 @@ export class BillingCategoryService {
     payload: CreateBillingCategoryDto,
     authContext?: AuthContext
   ) {
-    const existing = await this.repository.findExistingByCompanyNameAndType({
-      companyId: payload.companyId,
-      name: payload.name,
-      type: payload.type,
-    })
+    const category = await AppDataSource.transaction(
+      async (manager) => {
+        /*
+         * Serialize category mutations per company.
+         *
+         * The database's current unique index is based on
+         * company_public_id, which may be NULL for legacy
+         * companies. This application lock therefore also
+         * protects the logical companyId + name + type key.
+         */
+        await this.repository.lockCompany(
+          payload.companyId,
+          manager
+        )
 
-    if (existing) {
-      throw new ApiError(
-        409,
-        'BILLING_CATEGORY_ALREADY_EXISTS',
-        'A billing category with this name and type already exists'
-      )
-    }
+        const existing =
+          await this.repository.findExistingByCompanyNameAndType(
+            {
+              companyId: payload.companyId,
+              name: payload.name,
+              type: payload.type,
+            },
+            manager
+          )
 
-    const categoryEntity = this.repository.createEntity(payload)
-    const category = await this.repository.save(categoryEntity)
+        if (existing) {
+          throw new ApiError(
+            409,
+            'BILLING_CATEGORY_ALREADY_EXISTS',
+            'A billing category with this name and type already exists'
+          )
+        }
+
+        const categoryEntity =
+          this.repository.createEntity(
+            payload,
+            manager
+          )
+
+        return this.repository.save(
+          categoryEntity,
+          manager
+        )
+      }
+    )
 
     await this.auditLogService.log({
       companyId: category.companyId,
@@ -54,10 +84,17 @@ export class BillingCategoryService {
     return this.repository.findAll(filters)
   }
 
-  async findByPublicId(publicId: string, companyId: number) {
-    const category = await this.repository.findByPublicId(publicId)
+  async findByPublicId(
+    publicId: string,
+    companyId: number
+  ) {
+    const category =
+      await this.repository.findByPublicId(
+        publicId,
+        companyId
+      )
 
-    if (!category || category.companyId !== companyId) {
+    if (!category) {
       throw new ApiError(
         404,
         'BILLING_CATEGORY_NOT_FOUND',
@@ -74,29 +111,120 @@ export class BillingCategoryService {
     companyId: number,
     authContext?: AuthContext
   ) {
-    const category = await this.findByPublicId(publicId, companyId)
+    const transactionResult =
+      await AppDataSource.transaction(
+        async (manager) => {
+          await this.repository.lockCompany(
+            companyId,
+            manager
+          )
 
-    const originalCategory = {
-      ...category,
-    }
+          const category =
+            await this.repository.findByPublicIdForUpdate(
+              publicId,
+              companyId,
+              manager
+            )
 
-    Object.assign(category, payload)
+          if (!category) {
+            throw new ApiError(
+              404,
+              'BILLING_CATEGORY_NOT_FOUND',
+              'Billing category not found'
+            )
+          }
 
-    const updatedCategory = await this.repository.save(category)
+          /*
+           * Category type defines accounting semantics.
+           * Existing Income/Expense records reference the
+           * category by id, so changing INCOME <-> EXPENSE
+           * would reinterpret historical records.
+           */
+          if (
+            payload.type !== undefined &&
+            payload.type !== category.type
+          ) {
+            throw new ApiError(
+              409,
+              'BILLING_CATEGORY_TYPE_IMMUTABLE',
+              'Billing category type cannot be changed after creation'
+            )
+          }
+
+          const existing =
+            await this.repository.findExistingByCompanyNameAndType(
+              {
+                companyId,
+                name:
+                  payload.name ??
+                  category.name,
+                type: category.type,
+                excludeId: category.id,
+              },
+              manager
+            )
+
+          if (existing) {
+            throw new ApiError(
+              409,
+              'BILLING_CATEGORY_ALREADY_EXISTS',
+              'A billing category with this name and type already exists'
+            )
+          }
+
+          const originalCategory = {
+            ...category,
+          }
+
+          Object.assign(
+            category,
+            payload
+          )
+
+          const updatedCategory =
+            await this.repository.save(
+              category,
+              manager
+            )
+
+          return {
+            originalCategory,
+            updatedCategory,
+          }
+        }
+      )
 
     await this.auditLogService.log({
-      companyId: updatedCategory.companyId,
-      companyPublicId: updatedCategory.companyPublicId,
-      entityType: AuditEntityType.BILLING_CATEGORY,
-      entityId: updatedCategory.id,
-      entityPublicId: updatedCategory.publicId,
+      companyId:
+        transactionResult
+          .updatedCategory
+          .companyId,
+      companyPublicId:
+        transactionResult
+          .updatedCategory
+          .companyPublicId,
+      entityType:
+        AuditEntityType.BILLING_CATEGORY,
+      entityId:
+        transactionResult
+          .updatedCategory
+          .id,
+      entityPublicId:
+        transactionResult
+          .updatedCategory
+          .publicId,
       action: AuditAction.UPDATE,
-      oldValues: originalCategory,
-      newValues: updatedCategory,
+      oldValues:
+        transactionResult
+          .originalCategory,
+      newValues:
+        transactionResult
+          .updatedCategory,
       authContext,
     })
 
-    return updatedCategory
+    return transactionResult
+      .updatedCategory
   }
 
   async softDelete(
@@ -104,9 +232,51 @@ export class BillingCategoryService {
     companyId: number,
     authContext?: AuthContext
   ) {
-    const category = await this.findByPublicId(publicId, companyId)
+    const category =
+      await AppDataSource.transaction(
+        async (manager) => {
+          await this.repository.lockCompany(
+            companyId,
+            manager
+          )
 
-    await this.repository.softDeleteById(category.id)
+          const lockedCategory =
+            await this.repository.findByPublicIdForUpdate(
+              publicId,
+              companyId,
+              manager
+            )
+
+          if (!lockedCategory) {
+            throw new ApiError(
+              404,
+              'BILLING_CATEGORY_NOT_FOUND',
+              'Billing category not found'
+            )
+          }
+
+          const hasReferences =
+            await this.repository.hasReferences(
+              lockedCategory.id,
+              manager
+            )
+
+          if (hasReferences) {
+            throw new ApiError(
+              409,
+              'BILLING_CATEGORY_IN_USE',
+              'A billing category referenced by financial records or billing settings cannot be deleted'
+            )
+          }
+
+          await this.repository.softDeleteById(
+            lockedCategory.id,
+            manager
+          )
+
+          return lockedCategory
+        }
+      )
 
     await this.auditLogService.log({
       companyId: category.companyId,

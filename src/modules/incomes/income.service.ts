@@ -58,20 +58,23 @@ export class IncomeService {
     payload: CreateIncomeDto,
     manager: EntityManager,
   ) {
-    const category =
-      await this.categoryRepository
-        .findByIdAndCompanyAndType({
-          id: payload.categoryId,
-          companyId: payload.companyId,
-          type: BillingCategoryType.INCOME,
-        });
-
     await this.periodLockService
       .validateOpenPeriod(
         payload.companyId,
         payload.incomeDate,
         manager,
       );
+
+    const category =
+      await this.categoryRepository
+        .findActiveByIdAndCompanyAndTypeForUpdate(
+          {
+            id: payload.categoryId,
+            companyId: payload.companyId,
+            type: BillingCategoryType.INCOME,
+          },
+          manager,
+        );
 
     if (!category) {
       throw new ApiError(
@@ -579,6 +582,40 @@ export class IncomeService {
               manager,
             );
 
+          if (payload.categoryId !== undefined) {
+            const categoryChanged =
+              Number(payload.categoryId) !==
+              Number(income.categoryId);
+
+            const category = categoryChanged
+              ? await this.categoryRepository
+                  .findActiveByIdAndCompanyAndTypeForUpdate(
+                    {
+                      id: payload.categoryId,
+                      companyId: income.companyId,
+                      type: BillingCategoryType.INCOME,
+                    },
+                    manager,
+                  )
+              : await this.categoryRepository
+                  .findByIdAndCompanyAndTypeForUpdate(
+                    {
+                      id: payload.categoryId,
+                      companyId: income.companyId,
+                      type: BillingCategoryType.INCOME,
+                    },
+                    manager,
+                  );
+
+            if (!category) {
+              throw new ApiError(
+                400,
+                "INVALID_INCOME_CATEGORY",
+                "Invalid income category",
+              );
+            }
+          }
+
           const hasAllocations =
             await this.incomeAllocationService
               .hasAllocations(
@@ -838,6 +875,11 @@ export class IncomeService {
       payload.paymentMethodCode !==
         income.paymentMethodCode;
 
+    const categoryChanged =
+      payload.categoryId !== undefined &&
+      Number(payload.categoryId) !==
+        Number(income.categoryId);
+
     const descriptionChanged =
       payload.description !== undefined &&
       payload.description !==
@@ -915,6 +957,7 @@ export class IncomeService {
       currencyChanged ||
       dateChanged ||
       paymentMethodChanged ||
+      categoryChanged ||
       descriptionChanged ||
       referenceChanged ||
       clientNameChanged ||
@@ -964,6 +1007,11 @@ export class IncomeService {
       payload.incomeDate !==
         income.incomeDate;
 
+    const categoryChanged =
+      payload.categoryId !== undefined &&
+      Number(payload.categoryId) !==
+        Number(income.categoryId);
+
     const caseIdChanged =
       payload.caseId !== undefined &&
       Number(payload.caseId) !==
@@ -1001,6 +1049,7 @@ export class IncomeService {
       amountChanged ||
       currencyChanged ||
       dateChanged ||
+      categoryChanged ||
       caseIdChanged ||
       casePublicIdChanged ||
       statusChanged ||
