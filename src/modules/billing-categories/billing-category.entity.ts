@@ -5,7 +5,14 @@ import { BillingCategoryType } from '../../shared/enums'
 @Entity('billing_categories')
 @Index(['companyId'])
 @Index(['companyPublicId'])
-@Index(['companyId', 'name', 'type'], { unique: true })
+@Index(
+  'uq_billing_categories_company_name_type',
+  ['companyId', 'name', 'type'],
+  {
+    unique: true,
+    where: '"deleted_at" IS NULL',
+  },
+)
 export class BillingCategoryEntity extends BaseEntity {
     
     @Column({ name: 'company_id', type: 'int' })
