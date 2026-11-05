@@ -38,7 +38,22 @@ export class VendorService {
 
         const vendorEntity = this.repository.createEntity(payload)
 
-        const vendor = await this.repository.save(vendorEntity)
+        const vendor = await this.repository
+          .save(vendorEntity)
+          .catch((error: any) => {
+            if (
+              error?.code === '23505' &&
+              error?.constraint === 'uq_vendors_company_name'
+            ) {
+              throw new ApiError(
+                409,
+                'VENDOR_ALREADY_EXISTS',
+                'A vendor with this name already exists for this company'
+              )
+            }
+
+            throw error
+          })
 
         await this.auditLogService.log({
         companyId: vendor.companyId,
@@ -90,7 +105,22 @@ export class VendorService {
 
         Object.assign(vendor, payload)
 
-        const updatedVendor = await this.repository.save(vendor)
+        const updatedVendor = await this.repository
+          .save(vendor)
+          .catch((error: any) => {
+            if (
+              error?.code === '23505' &&
+              error?.constraint === 'uq_vendors_company_name'
+            ) {
+              throw new ApiError(
+                409,
+                'VENDOR_ALREADY_EXISTS',
+                'A vendor with this name already exists for this company'
+              )
+            }
+
+            throw error
+          })
 
         await this.auditLogService.log({
             companyId: updatedVendor.companyId,
