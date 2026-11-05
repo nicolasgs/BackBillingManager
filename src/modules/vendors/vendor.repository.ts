@@ -1,4 +1,4 @@
-import { IsNull } from 'typeorm'
+import { EntityManager, IsNull } from 'typeorm'
 import { AppDataSource } from '../../bootstrap/database'
 import { VendorEntity } from './vendor.entity'
 import { VendorFilters } from './interfaces/vendor-filters.interface'
@@ -10,8 +10,15 @@ export class VendorRepository {
         return this.repository.create(payload)
     }
 
-    save(vendor: VendorEntity) {
-        return this.repository.save(vendor)
+    save(
+        vendor: VendorEntity,
+        manager?: EntityManager
+    ) {
+        const repository = manager
+            ? manager.getRepository(VendorEntity)
+            : this.repository
+
+        return repository.save(vendor)
     }
 
     findExistingByCompanyAndName(params: {
@@ -78,7 +85,33 @@ export class VendorRepository {
         })
     }
 
-    softDeleteById(id: number) {
-        return this.repository.softDelete(id)
+    findByPublicIdForUpdate(
+        publicId: string,
+        companyId: number,
+        manager: EntityManager
+    ) {
+        return manager
+            .getRepository(VendorEntity)
+            .createQueryBuilder('vendor')
+            .where('vendor.publicId = :publicId', {
+                publicId,
+            })
+            .andWhere('vendor.companyId = :companyId', {
+                companyId,
+            })
+            .andWhere('vendor.deletedAt IS NULL')
+            .setLock('pessimistic_write')
+            .getOne()
+    }
+
+    softDeleteById(
+        id: number,
+        manager?: EntityManager
+    ) {
+        const repository = manager
+            ? manager.getRepository(VendorEntity)
+            : this.repository
+
+        return repository.softDelete(id)
     }
 }

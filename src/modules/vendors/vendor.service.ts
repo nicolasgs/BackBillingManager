@@ -1,4 +1,5 @@
 import { ApiError } from '../../shared/errors'
+import { AppDataSource } from '../../bootstrap/database'
 import {
   CreateVendorDto,
   ListVendorsQueryDto,
@@ -97,44 +98,65 @@ export class VendorService {
         companyId: number,
         authContext?: AuthContext
         ) {
-        const vendor = await this.findByPublicId(publicId, companyId)
+        const transactionResult = await AppDataSource.transaction(
+          async (manager) => {
+            const vendor = await this.repository.findByPublicIdForUpdate(
+              publicId,
+              companyId,
+              manager
+            )
 
-        const originalVendor = {
-            ...vendor,
-        }
-
-        Object.assign(vendor, payload)
-
-        const updatedVendor = await this.repository
-          .save(vendor)
-          .catch((error: any) => {
-            if (
-              error?.code === '23505' &&
-              error?.constraint === 'uq_vendors_company_name'
-            ) {
+            if (!vendor) {
               throw new ApiError(
-                409,
-                'VENDOR_ALREADY_EXISTS',
-                'A vendor with this name already exists for this company'
+                404,
+                'VENDOR_NOT_FOUND',
+                'Vendor not found'
               )
             }
 
-            throw error
-          })
+            const originalVendor = {
+              ...vendor,
+            }
+
+            Object.assign(vendor, payload)
+
+            const updatedVendor = await this.repository
+              .save(vendor, manager)
+              .catch((error: any) => {
+                if (
+                  error?.code === '23505' &&
+                  error?.constraint === 'uq_vendors_company_name'
+                ) {
+                  throw new ApiError(
+                    409,
+                    'VENDOR_ALREADY_EXISTS',
+                    'A vendor with this name already exists for this company'
+                  )
+                }
+
+                throw error
+              })
+
+            return {
+              originalVendor,
+              updatedVendor,
+            }
+          }
+        )
 
         await this.auditLogService.log({
-            companyId: updatedVendor.companyId,
-            companyPublicId: updatedVendor.companyPublicId,
+            companyId: transactionResult.updatedVendor.companyId,
+            companyPublicId: transactionResult.updatedVendor.companyPublicId,
             entityType: AuditEntityType.VENDOR,
-            entityId: updatedVendor.id,
-            entityPublicId: updatedVendor.publicId,
+            entityId: transactionResult.updatedVendor.id,
+            entityPublicId: transactionResult.updatedVendor.publicId,
             action: AuditAction.UPDATE,
-            oldValues: originalVendor,
-            newValues: updatedVendor,
+            oldValues: transactionResult.originalVendor,
+            newValues: transactionResult.updatedVendor,
             authContext,
         })
 
-        return updatedVendor
+        return transactionResult.updatedVendor
     }
 
     async softDelete(
@@ -142,9 +164,30 @@ export class VendorService {
         companyId: number,
         authContext?: AuthContext
         ) {
-        const vendor = await this.findByPublicId(publicId, companyId)
+        const vendor = await AppDataSource.transaction(
+          async (manager) => {
+            const lockedVendor = await this.repository.findByPublicIdForUpdate(
+              publicId,
+              companyId,
+              manager
+            )
 
-        await this.repository.softDeleteById(vendor.id)
+            if (!lockedVendor) {
+              throw new ApiError(
+                404,
+                'VENDOR_NOT_FOUND',
+                'Vendor not found'
+              )
+            }
+
+            await this.repository.softDeleteById(
+              lockedVendor.id,
+              manager
+            )
+
+            return lockedVendor
+          }
+        )
 
         await this.auditLogService.log({
             companyId: vendor.companyId,
