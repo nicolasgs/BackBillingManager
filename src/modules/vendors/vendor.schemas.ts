@@ -17,6 +17,7 @@ export const createVendorSchema = z.object({
 
 export const updateVendorSchema = createVendorSchema.partial().omit({
     companyId: true,
+    companyPublicId: true,
     createdBy: true,
 })
 
