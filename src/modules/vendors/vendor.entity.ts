@@ -2,7 +2,14 @@ import { Column, Entity, Index } from 'typeorm'
 import { BaseEntity } from '../../shared/entities/base.entity'
 
 @Entity('vendors')
-@Index(['companyId', 'name'])
+@Index(
+  'uq_vendors_company_name',
+  ['companyId', 'name'],
+  {
+    unique: true,
+    where: '"deleted_at" IS NULL',
+  },
+)
 @Index(['companyId', 'taxId'])
 export class VendorEntity extends BaseEntity {
   @Column({ name: 'company_id', type: 'int' })
