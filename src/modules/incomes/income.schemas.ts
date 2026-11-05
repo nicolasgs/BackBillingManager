@@ -44,10 +44,18 @@ export const createIncomeSchema = z.object({
   createdBy: z.string().min(1).max(100).optional(),
 });
 
-export const updateIncomeSchema = createIncomeSchema.partial().omit({
-  companyId: true,
-  createdBy: true,
-});
+export const updateIncomeSchema = createIncomeSchema
+  .partial()
+  .omit({
+    companyId: true,
+    companyPublicId: true,
+    createdBy: true,
+  })
+  .extend({
+    currency: z.string().length(3).optional(),
+    status: z.nativeEnum(TransactionStatus).optional(),
+    source: z.nativeEnum(TransactionSource).optional(),
+  });
 
 export const incomeParamsSchema = z.object({
   publicId: z.string().uuid(),

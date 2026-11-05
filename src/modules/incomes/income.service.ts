@@ -902,11 +902,6 @@ export class IncomeService {
       payload.caseReference !==
         income.caseReference;
 
-    const companyPublicIdChanged =
-      payload.companyPublicId !==
-        undefined &&
-      payload.companyPublicId !==
-        income.companyPublicId;
 
     const clientIdChanged =
       payload.clientId !== undefined &&
@@ -962,7 +957,6 @@ export class IncomeService {
       referenceChanged ||
       clientNameChanged ||
       caseReferenceChanged ||
-      companyPublicIdChanged ||
       clientIdChanged ||
       clientPublicIdChanged ||
       caseIdChanged ||
