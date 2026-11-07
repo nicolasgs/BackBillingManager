@@ -2,8 +2,15 @@ import { EntityManager } from "typeorm";
 
 import { AppDataSource } from "../../bootstrap/database";
 
-import { TransactionStatus } from "../../shared/enums";
+import {
+  AuditAction,
+  AuditEntityType,
+  TransactionStatus,
+} from "../../shared/enums";
 import { ApiError } from "../../shared/errors";
+
+import { AuditLogService } from "../audit-logs/audit-log.service";
+import { AuthContext } from "../audit-logs/interfaces/auth-context.interface";
 
 import { IncomeEntity } from "../incomes/income.entity";
 import { IncomeRepository } from "../incomes/income.repository";
@@ -17,20 +24,30 @@ export class ReceiptService {
     private readonly repository = new ReceiptRepository(),
     private readonly sequenceRepository = new ReceiptSequenceRepository(),
     private readonly incomeRepository = new IncomeRepository(),
+    private readonly auditLogService = new AuditLogService(),
   ) {}
 
   async createForIncome(
     incomePublicId: string,
     companyId: number,
     createdBy?: string,
+    authContext?: AuthContext,
   ) {
-    const income = await this.incomeRepository.findByPublicId(incomePublicId);
+    const income =
+      await this.incomeRepository
+        .findByPublicId(
+          incomePublicId,
+          companyId,
+        );
 
     if (!income || income.companyId !== companyId) {
       throw new ApiError(404, "INCOME_NOT_FOUND", "Income not found");
     }
 
-    const existing = await this.repository.findByIncomeId(income.id);
+    const existing = await this.repository.findByIncomeId(
+      income.id,
+      companyId,
+    );
 
     if (existing) {
       return existing;
@@ -65,6 +82,7 @@ export class ReceiptService {
             lockedIncome,
             createdBy,
             manager,
+            authContext,
           );
         },
       );
@@ -84,6 +102,7 @@ export class ReceiptService {
         const concurrentReceipt =
           await this.repository.findByIncomeId(
             income.id,
+            companyId,
           );
 
         if (concurrentReceipt) {
@@ -99,6 +118,7 @@ export class ReceiptService {
     income: IncomeEntity,
     createdBy: string | undefined,
     manager: EntityManager,
+    authContext?: AuthContext,
   ) {
     /*
      * This method intentionally does not open its
@@ -107,6 +127,7 @@ export class ReceiptService {
      */
     const existing = await this.repository.findByIncomeId(
       income.id,
+      income.companyId,
       manager,
     );
 
@@ -188,16 +209,81 @@ export class ReceiptService {
       manager,
     );
 
-    return await this.repository.save(receiptEntity, manager);
+    const savedReceipt =
+      await this.repository.save(
+        receiptEntity,
+        manager,
+      );
+
+    await this.auditLogService.log(
+      {
+        companyId: savedReceipt.companyId,
+        companyPublicId:
+          savedReceipt.companyPublicId ?? null,
+
+        entityType: AuditEntityType.RECEIPT,
+
+        entityId: savedReceipt.id,
+
+        entityPublicId:
+          savedReceipt.publicId,
+
+        action: AuditAction.CREATE,
+
+        oldValues: null,
+
+        newValues: {
+          id: savedReceipt.id,
+          publicId:
+            savedReceipt.publicId,
+
+          receiptNumber:
+            savedReceipt.receiptNumber,
+
+          incomeId:
+            savedReceipt.incomeId,
+
+          incomePublicId:
+            savedReceipt.incomePublicId,
+
+          amount:
+            Number(savedReceipt.amount),
+
+          currency:
+            savedReceipt.currency,
+
+          paymentDate:
+            savedReceipt.paymentDate,
+
+          paymentMethodCode:
+            savedReceipt.paymentMethodCode ??
+            null,
+
+          referenceNumber:
+            savedReceipt.referenceNumber ??
+            null,
+
+          issuedAt:
+            savedReceipt.issuedAt,
+        },
+
+        authContext,
+      },
+      manager,
+    );
+
+    return savedReceipt;
   }
 
   async hasReceiptForIncome(
     incomeId: number,
+    companyId: number,
     manager: EntityManager,
   ): Promise<boolean> {
     const receipt =
       await this.repository.findByIncomeId(
         incomeId,
+        companyId,
         manager,
       );
 
@@ -205,7 +291,11 @@ export class ReceiptService {
   }
 
   async findByPublicId(publicId: string, companyId: number) {
-    const receipt = await this.repository.findByPublicId(publicId);
+    const receipt =
+      await this.repository.findByPublicId(
+        publicId,
+        companyId,
+      );
 
     if (!receipt || receipt.companyId !== companyId) {
       throw new ApiError(404, "RECEIPT_NOT_FOUND", "Receipt not found");
@@ -215,7 +305,11 @@ export class ReceiptService {
   }
 
   async findByIncomePublicId(incomePublicId: string, companyId: number) {
-    const receipt = await this.repository.findByIncomePublicId(incomePublicId);
+    const receipt =
+      await this.repository.findByIncomePublicId(
+        incomePublicId,
+        companyId,
+      );
 
     if (!receipt || receipt.companyId !== companyId) {
       throw new ApiError(

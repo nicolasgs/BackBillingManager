@@ -138,6 +138,29 @@ export class IncomeService {
         );
     }
 
+    await this.auditLogService.log(
+      {
+        companyId: savedIncome.companyId,
+        companyPublicId:
+          savedIncome.companyPublicId,
+
+        entityType:
+          AuditEntityType.INCOME,
+
+        entityId: savedIncome.id,
+        entityPublicId:
+          savedIncome.publicId,
+
+        action:
+          AuditAction.CREATE,
+
+        newValues: savedIncome,
+
+        authContext,
+      },
+      manager,
+    );
+
     return savedIncome;
   }
 
@@ -168,21 +191,6 @@ export class IncomeService {
         },
       );
 
-    await this.auditLogService.log({
-      companyId: income.companyId,
-      companyPublicId:
-        income.companyPublicId,
-
-      entityType: AuditEntityType.INCOME,
-      entityId: income.id,
-      entityPublicId: income.publicId,
-
-      action: AuditAction.CREATE,
-
-      newValues: income,
-
-      authContext,
-    });
 
     return income;
   }
@@ -228,6 +236,7 @@ export class IncomeService {
           existing.publicId,
           payload.companyId,
           createdBy,
+          authContext,
         );
 
       return existing;
@@ -407,6 +416,7 @@ export class IncomeService {
                 createdIncome,
                 createdBy,
                 manager,
+                authContext,
               );
 
             return {
@@ -437,6 +447,7 @@ export class IncomeService {
               concurrentExisting.publicId,
               payload.companyId,
               createdBy,
+              authContext,
             );
 
           return concurrentExisting;
@@ -461,37 +472,10 @@ export class IncomeService {
           transactionResult.income.publicId,
           payload.companyId,
           createdBy,
+          authContext,
         );
     }
 
-    /*
-     * Keep audit behavior outside the accounting
-     * transaction, matching normal Income creation.
-     * Do not create a second audit entry for an
-     * idempotent retry.
-     */
-    if (transactionResult.created) {
-      const income =
-        transactionResult.income;
-
-      await this.auditLogService.log({
-        companyId: income.companyId,
-        companyPublicId:
-          income.companyPublicId,
-
-        entityType:
-          AuditEntityType.INCOME,
-        entityId: income.id,
-        entityPublicId:
-          income.publicId,
-
-        action: AuditAction.CREATE,
-
-        newValues: income,
-
-        authContext,
-      });
-    }
 
     return transactionResult.income;
   }
@@ -508,7 +492,10 @@ export class IncomeService {
   ) {
     const income =
       await this.incomeRepository
-        .findByPublicId(publicId);
+        .findByPublicId(
+          publicId,
+          companyId,
+        );
 
     if (
       !income ||
@@ -644,6 +631,7 @@ export class IncomeService {
             await this.receiptService
               .hasReceiptForIncome(
                 Number(income.id),
+                income.companyId,
                 manager,
               );
 
@@ -694,6 +682,37 @@ export class IncomeService {
               );
           }
 
+          await this.auditLogService.log(
+            {
+              companyId:
+                updatedIncome.companyId,
+
+              companyPublicId:
+                updatedIncome.companyPublicId,
+
+              entityType:
+                AuditEntityType.INCOME,
+
+              entityId:
+                updatedIncome.id,
+
+              entityPublicId:
+                updatedIncome.publicId,
+
+              action:
+                AuditAction.UPDATE,
+
+              oldValues:
+                originalIncome,
+
+              newValues:
+                updatedIncome,
+
+              authContext,
+            },
+            manager,
+          );
+
           return {
             originalIncome,
             updatedIncome,
@@ -701,43 +720,6 @@ export class IncomeService {
         },
       );
 
-    await this.auditLogService.log({
-      companyId:
-        transactionResult
-          .updatedIncome
-          .companyId,
-
-      companyPublicId:
-        transactionResult
-          .updatedIncome
-          .companyPublicId,
-
-      entityType:
-        AuditEntityType.INCOME,
-
-      entityId:
-        transactionResult
-          .updatedIncome
-          .id,
-
-      entityPublicId:
-        transactionResult
-          .updatedIncome
-          .publicId,
-
-      action:
-        AuditAction.UPDATE,
-
-      oldValues:
-        transactionResult
-          .originalIncome,
-
-      newValues:
-        transactionResult
-          .updatedIncome,
-
-      authContext,
-    });
 
     return transactionResult
       .updatedIncome;
@@ -795,6 +777,7 @@ export class IncomeService {
             await this.receiptService
               .hasReceiptForIncome(
                 Number(lockedIncome.id),
+                lockedIncome.companyId,
                 manager,
               );
 
@@ -814,29 +797,37 @@ export class IncomeService {
               manager,
             );
 
+          await this.auditLogService.log(
+            {
+              companyId:
+                lockedIncome.companyId,
+
+              companyPublicId:
+                lockedIncome.companyPublicId,
+
+              entityType:
+                AuditEntityType.INCOME,
+
+              entityId:
+                lockedIncome.id,
+
+              entityPublicId:
+                lockedIncome.publicId,
+
+              action:
+                AuditAction.DELETE,
+
+              oldValues:
+                lockedIncome,
+
+              authContext,
+            },
+            manager,
+          );
+
           return lockedIncome;
         },
       );
-
-    await this.auditLogService.log({
-      companyId: income.companyId,
-      companyPublicId:
-        income.companyPublicId,
-
-      entityType:
-        AuditEntityType.INCOME,
-
-      entityId: income.id,
-      entityPublicId:
-        income.publicId,
-
-      action:
-        AuditAction.DELETE,
-
-      oldValues: income,
-
-      authContext,
-    });
 
     return {
       publicId: income.publicId,

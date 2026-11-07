@@ -1,4 +1,4 @@
-import { Between, In, IsNull } from "typeorm";
+import { Between, EntityManager, In, IsNull } from "typeorm";
 
 import { AppDataSource } from "../../bootstrap/database";
 import {
@@ -50,10 +50,19 @@ export type MonthlyClosingSnapshotResult = {
   totalExpense: number;
   netAmount: number;
   participantStatementCount: number;
+  originalStatus: ClosingStatus;
 };
 
 export class MonthlyClosingRepository {
   private closingRepository = AppDataSource.getRepository(MonthlyClosingEntity);
+
+  private getClosingRepository(
+    manager?: EntityManager,
+  ) {
+    return manager
+      ? manager.getRepository(MonthlyClosingEntity)
+      : this.closingRepository;
+  }
 
   private itemRepository = AppDataSource.getRepository(
     MonthlyClosingItemEntity,
@@ -66,12 +75,20 @@ export class MonthlyClosingRepository {
   private periodLockService =
     new PeriodLockService();
 
-  createEntity(payload: Partial<MonthlyClosingEntity>) {
-    return this.closingRepository.create(payload);
+  createEntity(
+    payload: Partial<MonthlyClosingEntity>,
+    manager?: EntityManager,
+  ) {
+    return this.getClosingRepository(manager)
+      .create(payload);
   }
 
-  save(closing: MonthlyClosingEntity) {
-    return this.closingRepository.save(closing);
+  save(
+    closing: MonthlyClosingEntity,
+    manager?: EntityManager,
+  ) {
+    return this.getClosingRepository(manager)
+      .save(closing);
   }
 
   updateById(id: number, payload: Partial<MonthlyClosingEntity>) {
@@ -82,8 +99,9 @@ export class MonthlyClosingRepository {
     companyId: number,
     year: number,
     month: number,
+    manager?: EntityManager,
   ) {
-    return this.closingRepository.findOne({
+    return this.getClosingRepository(manager).findOne({
       where: {
         companyId,
         year,
@@ -125,10 +143,15 @@ export class MonthlyClosingRepository {
       .getMany();
   }
 
-  findByPublicId(publicId: string) {
-    return this.closingRepository.findOne({
+  findByPublicId(
+    publicId: string,
+    companyId: number,
+    manager?: EntityManager,
+  ) {
+    return this.getClosingRepository(manager).findOne({
       where: {
         publicId,
+        companyId,
         deletedAt: IsNull(),
       },
       relations: {
@@ -218,13 +241,18 @@ export class MonthlyClosingRepository {
     return this.itemRepository.save(items);
   }
 
-  async closeWithSnapshots(params: {
-    closingId: number;
-    companyId: number;
-    closingType: ClosingType;
-    closedBy: string;
-  }): Promise<MonthlyClosingSnapshotResult> {
-    return AppDataSource.transaction(async (manager) => {
+  async closeWithSnapshots(
+    params: {
+      closingId: number;
+      companyId: number;
+      closingType: ClosingType;
+      closedBy: string;
+    },
+    transactionManager?: EntityManager,
+  ): Promise<MonthlyClosingSnapshotResult> {
+    const execute = async (
+      manager: EntityManager,
+    ): Promise<MonthlyClosingSnapshotResult> => {
       const closingRepository =
         manager.getRepository(MonthlyClosingEntity);
 
@@ -901,17 +929,29 @@ export class MonthlyClosingRepository {
           fromCents(netAmountCents),
         participantStatementCount:
           savedStatements.length,
+        originalStatus:
+          closing.status,
       };
-    });
+    };
+
+    if (transactionManager) {
+      return execute(transactionManager);
+    }
+
+    return AppDataSource.transaction(execute);
   }
 
-  async reopenWithSettlementGuard(params: {
-    closingId: number;
-    companyId: number;
-    notes: string | null | undefined;
-  }) {
-    return AppDataSource.transaction(
-      async (manager) => {
+  async reopenWithSettlementGuard(
+    params: {
+      closingId: number;
+      companyId: number;
+      notes: string | null | undefined;
+    },
+    transactionManager?: EntityManager,
+  ) {
+    const execute = async (
+      manager: EntityManager,
+    ) => {
         const closingRepository =
           manager.getRepository(
             MonthlyClosingEntity,
@@ -1006,6 +1046,16 @@ export class MonthlyClosingRepository {
           );
         }
 
+        const oldValues = {
+          status: closing.status,
+          closedBy: closing.closedBy,
+          closedAt: closing.closedAt,
+          notes: closing.notes,
+        };
+
+        const notes =
+          params.notes ?? closing.notes;
+
         await closingRepository.update(
           {
             id: closing.id,
@@ -1014,14 +1064,22 @@ export class MonthlyClosingRepository {
             status:
               ClosingStatus.REOPENED,
 
-            notes:
-              params.notes,
+            notes,
 
             closedBy: null,
             closedAt: null,
           },
         );
-      },
-    );
+
+        return {
+          oldValues,
+        };
+    };
+
+    if (transactionManager) {
+      return execute(transactionManager);
+    }
+
+    return AppDataSource.transaction(execute);
   }
 }

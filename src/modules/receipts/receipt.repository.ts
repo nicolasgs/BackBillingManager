@@ -23,7 +23,11 @@ export class ReceiptRepository {
     return repository.save(receipt);
   }
 
-  findByPublicId(publicId: string, manager?: EntityManager) {
+  findByPublicId(
+    publicId: string,
+    companyId: number,
+    manager?: EntityManager,
+  ) {
     const repository = manager
       ? manager.getRepository(ReceiptEntity)
       : this.repository;
@@ -31,6 +35,7 @@ export class ReceiptRepository {
     return repository.findOne({
       where: {
         publicId,
+        companyId,
         deletedAt: IsNull(),
       },
       relations: {
@@ -39,7 +44,11 @@ export class ReceiptRepository {
     });
   }
 
-  findByIncomeId(incomeId: number, manager?: EntityManager) {
+  findByIncomeId(
+    incomeId: number,
+    companyId: number,
+    manager?: EntityManager,
+  ) {
     const repository = manager
       ? manager.getRepository(ReceiptEntity)
       : this.repository;
@@ -47,6 +56,7 @@ export class ReceiptRepository {
     return repository.findOne({
       where: {
         incomeId,
+        companyId,
         deletedAt: IsNull(),
       },
       relations: {
@@ -55,7 +65,11 @@ export class ReceiptRepository {
     });
   }
 
-  findByIncomePublicId(incomePublicId: string, manager?: EntityManager) {
+  findByIncomePublicId(
+    incomePublicId: string,
+    companyId: number,
+    manager?: EntityManager,
+  ) {
     const repository = manager
       ? manager.getRepository(ReceiptEntity)
       : this.repository;
@@ -63,6 +77,7 @@ export class ReceiptRepository {
     return repository.findOne({
       where: {
         incomePublicId,
+        companyId,
         deletedAt: IsNull(),
       },
       relations: {

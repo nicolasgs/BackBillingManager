@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 
 import { sendSuccess } from "../../shared/responses";
+import { buildAuthContext } from "../../shared/utils/build-auth-context";
 
 import { BillingSettingsService } from "./billing-settings.service";
 
@@ -51,15 +52,23 @@ export class BillingSettingsController {
         });
       }
 
-      const settings = await service.upsert({
-        ...req.body,
+      const authContext =
+        buildAuthContext(req);
 
-        companyId,
+      const settings = await service.upsert(
+        {
+          ...req.body,
 
-        companyPublicId: req.user?.companyPublicId ?? null,
+          companyId,
 
-        createdBy: req.user?.id,
-      });
+          companyPublicId:
+            req.user?.companyPublicId ??
+            null,
+
+          createdBy: req.user?.id,
+        },
+        authContext,
+      );
 
       return sendSuccess({
         res,

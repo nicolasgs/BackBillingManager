@@ -24,28 +24,19 @@ export class VendorService {
         payload: CreateVendorDto,
         authContext?: AuthContext
     ) {
-        const existing = await this.repository.findExistingByCompanyAndName({
-        companyId: payload.companyId,
-        name: payload.name,
-        })
+        return AppDataSource.transaction(
+          async (manager) => {
+            const existing =
+              await this.repository
+                .findExistingByCompanyAndName(
+                  {
+                    companyId: payload.companyId,
+                    name: payload.name,
+                  },
+                  manager
+                )
 
-        if (existing) {
-        throw new ApiError(
-            409,
-            'VENDOR_ALREADY_EXISTS',
-            'A vendor with this name already exists for this company'
-        )
-        }
-
-        const vendorEntity = this.repository.createEntity(payload)
-
-        const vendor = await this.repository
-          .save(vendorEntity)
-          .catch((error: any) => {
-            if (
-              error?.code === '23505' &&
-              error?.constraint === 'uq_vendors_company_name'
-            ) {
+            if (existing) {
               throw new ApiError(
                 409,
                 'VENDOR_ALREADY_EXISTS',
@@ -53,25 +44,59 @@ export class VendorService {
               )
             }
 
-            throw error
-          })
+            const vendorEntity =
+              this.repository.createEntity(payload)
 
-        await this.auditLogService.log({
-        companyId: vendor.companyId,
-        companyPublicId: vendor.companyPublicId,
+            const vendor =
+              await this.repository
+                .save(vendorEntity, manager)
+                .catch((error: any) => {
+                  if (
+                    error?.code === '23505' &&
+                    error?.constraint ===
+                      'uq_vendors_company_name'
+                  ) {
+                    throw new ApiError(
+                      409,
+                      'VENDOR_ALREADY_EXISTS',
+                      'A vendor with this name already exists for this company'
+                    )
+                  }
 
-        entityType: AuditEntityType.VENDOR,
-        entityId: vendor.id,
-        entityPublicId: vendor.publicId,
+                  throw error
+                })
 
-        action: AuditAction.CREATE,
+            await this.auditLogService.log(
+              {
+                companyId:
+                  vendor.companyId,
 
-        newValues: vendor,
+                companyPublicId:
+                  vendor.companyPublicId,
 
-        authContext,
-        })
+                entityType:
+                  AuditEntityType.VENDOR,
 
-        return vendor
+                entityId:
+                  vendor.id,
+
+                entityPublicId:
+                  vendor.publicId,
+
+                action:
+                  AuditAction.CREATE,
+
+                newValues:
+                  vendor,
+
+                authContext,
+              },
+              manager
+            )
+
+            return vendor
+          }
+        )
     }
 
     async findAll(filters: VendorFilters) {
@@ -79,7 +104,10 @@ export class VendorService {
     }
 
     async findByPublicId(publicId: string, companyId: number) {
-        const vendor = await this.repository.findByPublicId(publicId)
+        const vendor = await this.repository.findByPublicId(
+            publicId,
+            companyId
+        )
 
         if (!vendor || vendor.companyId !== companyId) {
             throw new ApiError(
@@ -137,6 +165,37 @@ export class VendorService {
                 throw error
               })
 
+            await this.auditLogService.log(
+              {
+                companyId:
+                  updatedVendor.companyId,
+
+                companyPublicId:
+                  updatedVendor.companyPublicId,
+
+                entityType:
+                  AuditEntityType.VENDOR,
+
+                entityId:
+                  updatedVendor.id,
+
+                entityPublicId:
+                  updatedVendor.publicId,
+
+                action:
+                  AuditAction.UPDATE,
+
+                oldValues:
+                  originalVendor,
+
+                newValues:
+                  updatedVendor,
+
+                authContext,
+              },
+              manager
+            )
+
             return {
               originalVendor,
               updatedVendor,
@@ -144,17 +203,6 @@ export class VendorService {
           }
         )
 
-        await this.auditLogService.log({
-            companyId: transactionResult.updatedVendor.companyId,
-            companyPublicId: transactionResult.updatedVendor.companyPublicId,
-            entityType: AuditEntityType.VENDOR,
-            entityId: transactionResult.updatedVendor.id,
-            entityPublicId: transactionResult.updatedVendor.publicId,
-            action: AuditAction.UPDATE,
-            oldValues: transactionResult.originalVendor,
-            newValues: transactionResult.updatedVendor,
-            authContext,
-        })
 
         return transactionResult.updatedVendor
     }
@@ -185,20 +233,38 @@ export class VendorService {
               manager
             )
 
+            await this.auditLogService.log(
+              {
+                companyId:
+                  lockedVendor.companyId,
+
+                companyPublicId:
+                  lockedVendor.companyPublicId,
+
+                entityType:
+                  AuditEntityType.VENDOR,
+
+                entityId:
+                  lockedVendor.id,
+
+                entityPublicId:
+                  lockedVendor.publicId,
+
+                action:
+                  AuditAction.DELETE,
+
+                oldValues:
+                  lockedVendor,
+
+                authContext,
+              },
+              manager
+            )
+
             return lockedVendor
           }
         )
 
-        await this.auditLogService.log({
-            companyId: vendor.companyId,
-            companyPublicId: vendor.companyPublicId,
-            entityType: AuditEntityType.VENDOR,
-            entityId: vendor.id,
-            entityPublicId: vendor.publicId,
-            action: AuditAction.DELETE,
-            oldValues: vendor,
-            authContext,
-        })
 
         return {
             publicId: vendor.publicId,

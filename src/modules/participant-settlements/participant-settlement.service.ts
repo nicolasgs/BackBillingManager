@@ -131,6 +131,58 @@ export class ParticipantSettlementService {
         payload,
         companyId,
         createdBy,
+        async (
+          transactionResult,
+          manager,
+        ) => {
+          const settlement =
+            transactionResult.settlement;
+
+          await this.auditLogService.log(
+            {
+              companyId:
+                settlement.companyId,
+
+              companyPublicId:
+                settlement.companyPublicId,
+
+              entityType:
+                AuditEntityType.PARTICIPANT_SETTLEMENT,
+
+              entityId:
+                settlement.id,
+
+              entityPublicId:
+                settlement.publicId,
+
+              action:
+                AuditAction.CREATE,
+
+              newValues: {
+                participantStatementId:
+                  settlement.participantStatementId,
+
+                ownerType:
+                  settlement.ownerType,
+
+                ownerPublicId:
+                  settlement.ownerPublicId ??
+                  null,
+
+                ownerName:
+                  settlement.ownerName ??
+                  null,
+
+                ...settlementAuditSnapshot(
+                  settlement,
+                ),
+              },
+
+              authContext,
+            },
+            manager,
+          );
+        },
       );
 
     const settlement =
@@ -138,50 +190,6 @@ export class ParticipantSettlementService {
         result.settlement.publicId,
         companyId,
       );
-
-    if (result.created) {
-      await this.auditLogService.log({
-        companyId:
-          settlement.companyId,
-
-        companyPublicId:
-          settlement.companyPublicId,
-
-        entityType:
-          AuditEntityType.PARTICIPANT_SETTLEMENT,
-
-        entityId:
-          settlement.id,
-
-        entityPublicId:
-          settlement.publicId,
-
-        action:
-          AuditAction.CREATE,
-
-        newValues: {
-          participantStatementId:
-            settlement.participantStatementId,
-
-          ownerType:
-            settlement.ownerType,
-
-          ownerPublicId:
-            settlement.ownerPublicId ??
-            null,
-
-          ownerName:
-            settlement.ownerName ??
-            null,
-
-          ...settlementAuditSnapshot(
-            settlement,
-          ),
-        },
-
-        authContext,
-      });
-    }
 
     return {
       settlement,
@@ -204,6 +212,79 @@ export class ParticipantSettlementService {
         payload,
         companyId,
         createdBy,
+        async (
+          transactionResult,
+          manager,
+        ) => {
+          const settlement =
+            transactionResult.settlement;
+
+          const payout =
+            transactionResult.payout;
+
+          await this.auditLogService.log(
+            {
+              companyId:
+                payout.companyId,
+
+              companyPublicId:
+                payout.companyPublicId,
+
+              entityType:
+                AuditEntityType.PARTICIPANT_PAYOUT,
+
+              entityId:
+                payout.id,
+
+              entityPublicId:
+                payout.publicId,
+
+              action:
+                AuditAction.CREATE,
+
+              newValues:
+                payoutAuditSnapshot(
+                  payout,
+                ),
+
+              authContext,
+            },
+            manager,
+          );
+
+          await this.auditLogService.log(
+            {
+              companyId:
+                settlement.companyId,
+
+              companyPublicId:
+                settlement.companyPublicId,
+
+              entityType:
+                AuditEntityType.PARTICIPANT_SETTLEMENT,
+
+              entityId:
+                settlement.id,
+
+              entityPublicId:
+                settlement.publicId,
+
+              action:
+                AuditAction.UPDATE,
+
+              oldValues:
+                transactionResult.settlementBefore,
+
+              newValues:
+                settlementAuditSnapshot(
+                  settlement,
+                ),
+
+              authContext,
+            },
+            manager,
+          );
+        },
       );
 
     const settlement =
@@ -219,65 +300,6 @@ export class ParticipantSettlementService {
           result.payout.publicId,
       ) ??
       result.payout;
-
-    if (result.created) {
-      await this.auditLogService.log({
-        companyId:
-          payout.companyId,
-
-        companyPublicId:
-          payout.companyPublicId,
-
-        entityType:
-          AuditEntityType.PARTICIPANT_PAYOUT,
-
-        entityId:
-          payout.id,
-
-        entityPublicId:
-          payout.publicId,
-
-        action:
-          AuditAction.CREATE,
-
-        newValues:
-          payoutAuditSnapshot(
-            payout,
-          ),
-
-        authContext,
-      });
-
-      await this.auditLogService.log({
-        companyId:
-          settlement.companyId,
-
-        companyPublicId:
-          settlement.companyPublicId,
-
-        entityType:
-          AuditEntityType.PARTICIPANT_SETTLEMENT,
-
-        entityId:
-          settlement.id,
-
-        entityPublicId:
-          settlement.publicId,
-
-        action:
-          AuditAction.UPDATE,
-
-        oldValues:
-          result.settlementBefore,
-
-        newValues:
-          settlementAuditSnapshot(
-            settlement,
-          ),
-
-        authContext,
-      });
-    }
 
     return {
       settlement,
@@ -303,6 +325,82 @@ export class ParticipantSettlementService {
         payload,
         companyId,
         voidedBy,
+        async (
+          transactionResult,
+          manager,
+        ) => {
+          const settlement =
+            transactionResult.settlement;
+
+          const payout =
+            transactionResult.payout;
+
+          await this.auditLogService.log(
+            {
+              companyId:
+                payout.companyId,
+
+              companyPublicId:
+                payout.companyPublicId,
+
+              entityType:
+                AuditEntityType.PARTICIPANT_PAYOUT,
+
+              entityId:
+                payout.id,
+
+              entityPublicId:
+                payout.publicId,
+
+              action:
+                AuditAction.VOID,
+
+              oldValues:
+                transactionResult.payoutBefore,
+
+              newValues:
+                payoutAuditSnapshot(
+                  payout,
+                ),
+
+              authContext,
+            },
+            manager,
+          );
+
+          await this.auditLogService.log(
+            {
+              companyId:
+                settlement.companyId,
+
+              companyPublicId:
+                settlement.companyPublicId,
+
+              entityType:
+                AuditEntityType.PARTICIPANT_SETTLEMENT,
+
+              entityId:
+                settlement.id,
+
+              entityPublicId:
+                settlement.publicId,
+
+              action:
+                AuditAction.UPDATE,
+
+              oldValues:
+                transactionResult.settlementBefore,
+
+              newValues:
+                settlementAuditSnapshot(
+                  settlement,
+                ),
+
+              authContext,
+            },
+            manager,
+          );
+        },
       );
 
     const settlement =
@@ -319,68 +417,6 @@ export class ParticipantSettlementService {
       ) ??
       result.payout;
 
-    if (result.voided) {
-      await this.auditLogService.log({
-        companyId:
-          payout.companyId,
-
-        companyPublicId:
-          payout.companyPublicId,
-
-        entityType:
-          AuditEntityType.PARTICIPANT_PAYOUT,
-
-        entityId:
-          payout.id,
-
-        entityPublicId:
-          payout.publicId,
-
-        action:
-          AuditAction.VOID,
-
-        oldValues:
-          result.payoutBefore,
-
-        newValues:
-          payoutAuditSnapshot(
-            payout,
-          ),
-
-        authContext,
-      });
-
-      await this.auditLogService.log({
-        companyId:
-          settlement.companyId,
-
-        companyPublicId:
-          settlement.companyPublicId,
-
-        entityType:
-          AuditEntityType.PARTICIPANT_SETTLEMENT,
-
-        entityId:
-          settlement.id,
-
-        entityPublicId:
-          settlement.publicId,
-
-        action:
-          AuditAction.UPDATE,
-
-        oldValues:
-          result.settlementBefore,
-
-        newValues:
-          settlementAuditSnapshot(
-            settlement,
-          ),
-
-        authContext,
-      });
-    }
-
     return {
       settlement,
       payout,
@@ -390,4 +426,5 @@ export class ParticipantSettlementService {
         !result.voided,
     };
   }
+
 }

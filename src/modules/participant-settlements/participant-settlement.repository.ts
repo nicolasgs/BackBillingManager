@@ -281,6 +281,10 @@ export class ParticipantSettlementRepository {
       CreateParticipantSettlementDto,
     companyId: number,
     createdBy: string,
+    beforeCommit?: (
+      result: CreateSettlementResult,
+      manager: EntityManager,
+    ) => Promise<void>,
   ): Promise<CreateSettlementResult> {
     return AppDataSource.transaction(
       async (manager) => {
@@ -489,10 +493,19 @@ export class ParticipantSettlementRepository {
             settlement,
           );
 
-        return {
+        const result: CreateSettlementResult = {
           settlement: saved,
           created: true,
         };
+
+        if (beforeCommit) {
+          await beforeCommit(
+            result,
+            manager,
+          );
+        }
+
+        return result;
       },
     );
   }
@@ -619,6 +632,10 @@ export class ParticipantSettlementRepository {
       CreateParticipantPayoutDto,
     companyId: number,
     createdBy: string,
+    beforeCommit?: (
+      result: CreatePayoutResult,
+      manager: EntityManager,
+    ) => Promise<void>,
   ): Promise<CreatePayoutResult> {
     const normalizedProvider =
       payload.externalProvider ??
@@ -862,7 +879,7 @@ export class ParticipantSettlementRepository {
             createdBy,
           );
 
-        return {
+        const result: CreatePayoutResult = {
           settlement:
             updatedSettlement,
           payout:
@@ -870,6 +887,15 @@ export class ParticipantSettlementRepository {
           created: true,
           settlementBefore,
         };
+
+        if (beforeCommit) {
+          await beforeCommit(
+            result,
+            manager,
+          );
+        }
+
+        return result;
       });
     } catch (error: any) {
       /*
@@ -954,6 +980,10 @@ export class ParticipantSettlementRepository {
       VoidParticipantPayoutDto,
     companyId: number,
     voidedBy: string,
+    beforeCommit?: (
+      result: VoidPayoutResult,
+      manager: EntityManager,
+    ) => Promise<void>,
   ): Promise<VoidPayoutResult> {
     return AppDataSource.transaction(
       async (manager) => {
@@ -1088,7 +1118,7 @@ export class ParticipantSettlementRepository {
             voidedBy,
           );
 
-        return {
+        const result: VoidPayoutResult = {
           settlement:
             updatedSettlement,
           payout:
@@ -1097,6 +1127,15 @@ export class ParticipantSettlementRepository {
           payoutBefore,
           settlementBefore,
         };
+
+        if (beforeCommit) {
+          await beforeCommit(
+            result,
+            manager,
+          );
+        }
+
+        return result;
       },
     );
   }

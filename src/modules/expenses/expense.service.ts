@@ -183,37 +183,45 @@ export class ExpenseService {
                 manager,
               );
 
-          return this.expenseRepository
-            .save(
-              expenseEntity,
-              manager,
-            );
+          const savedExpense =
+            await this.expenseRepository
+              .save(
+                expenseEntity,
+                manager,
+              );
+
+          await this.auditLogService.log(
+            {
+              companyId:
+                savedExpense.companyId,
+
+              companyPublicId:
+                savedExpense.companyPublicId,
+
+              entityType:
+                AuditEntityType.EXPENSE,
+
+              entityId:
+                savedExpense.id,
+
+              entityPublicId:
+                savedExpense.publicId,
+
+              action:
+                AuditAction.CREATE,
+
+              newValues:
+                savedExpense,
+
+              authContext,
+            },
+            manager,
+          );
+
+          return savedExpense;
         },
       );
 
-    await this.auditLogService.log({
-      companyId: expense.companyId,
-
-      companyPublicId:
-        expense.companyPublicId,
-
-      entityType:
-        AuditEntityType.EXPENSE,
-
-      entityId:
-        expense.id,
-
-      entityPublicId:
-        expense.publicId,
-
-      action:
-        AuditAction.CREATE,
-
-      newValues:
-        expense,
-
-      authContext,
-    });
 
     return expense;
   }
@@ -231,7 +239,10 @@ export class ExpenseService {
   ) {
     const expense =
       await this.expenseRepository
-        .findByPublicId(publicId);
+        .findByPublicId(
+          publicId,
+          companyId,
+        );
 
     if (
       !expense ||
@@ -271,6 +282,11 @@ export class ExpenseService {
               "Expense not found",
             );
           }
+
+          this.assertVendorSnapshotMutationAllowed(
+            expense,
+            payload,
+          );
 
           const originalExpense = {
             ...expense,
@@ -461,6 +477,37 @@ export class ExpenseService {
                 manager,
               );
 
+          await this.auditLogService.log(
+            {
+              companyId:
+                updatedExpense.companyId,
+
+              companyPublicId:
+                updatedExpense.companyPublicId,
+
+              entityType:
+                AuditEntityType.EXPENSE,
+
+              entityId:
+                updatedExpense.id,
+
+              entityPublicId:
+                updatedExpense.publicId,
+
+              action:
+                AuditAction.UPDATE,
+
+              oldValues:
+                originalExpense,
+
+              newValues:
+                updatedExpense,
+
+              authContext,
+            },
+            manager,
+          );
+
           return {
             originalExpense,
             updatedExpense,
@@ -468,43 +515,6 @@ export class ExpenseService {
         },
       );
 
-    await this.auditLogService.log({
-      companyId:
-        transactionResult
-          .updatedExpense
-          .companyId,
-
-      companyPublicId:
-        transactionResult
-          .updatedExpense
-          .companyPublicId,
-
-      entityType:
-        AuditEntityType.EXPENSE,
-
-      entityId:
-        transactionResult
-          .updatedExpense
-          .id,
-
-      entityPublicId:
-        transactionResult
-          .updatedExpense
-          .publicId,
-
-      action:
-        AuditAction.UPDATE,
-
-      oldValues:
-        transactionResult
-          .originalExpense,
-
-      newValues:
-        transactionResult
-          .updatedExpense,
-
-      authContext,
-    });
 
     return transactionResult
       .updatedExpense;
@@ -546,34 +556,38 @@ export class ExpenseService {
               manager,
             );
 
+          await this.auditLogService.log(
+            {
+              companyId:
+                lockedExpense.companyId,
+
+              companyPublicId:
+                lockedExpense.companyPublicId,
+
+              entityType:
+                AuditEntityType.EXPENSE,
+
+              entityId:
+                lockedExpense.id,
+
+              entityPublicId:
+                lockedExpense.publicId,
+
+              action:
+                AuditAction.DELETE,
+
+              oldValues:
+                lockedExpense,
+
+              authContext,
+            },
+            manager,
+          );
+
           return lockedExpense;
         },
       );
 
-    await this.auditLogService.log({
-      companyId:
-        expense.companyId,
-
-      companyPublicId:
-        expense.companyPublicId,
-
-      entityType:
-        AuditEntityType.EXPENSE,
-
-      entityId:
-        expense.id,
-
-      entityPublicId:
-        expense.publicId,
-
-      action:
-        AuditAction.DELETE,
-
-      oldValues:
-        expense,
-
-      authContext,
-    });
 
     return {
       publicId:
@@ -581,6 +595,46 @@ export class ExpenseService {
 
       deleted: true,
     };
+  }
+  /*
+   * A linked Vendor owns the Expense vendor
+   * snapshot. Direct snapshot edits are allowed
+   * only for ad-hoc expenses without vendorId.
+   *
+   * When vendorId is supplied, update() refreshes
+   * both snapshot fields from the real Vendor.
+   */
+  private assertVendorSnapshotMutationAllowed(
+    expense: ExpenseEntity,
+    payload: UpdateExpenseDto,
+  ) {
+    if (
+      expense.vendorId == null ||
+      payload.vendorId !== undefined
+    ) {
+      return;
+    }
+
+    const vendorNameChanged =
+      payload.vendorName !== undefined &&
+      payload.vendorName !==
+        expense.vendorName;
+
+    const vendorPublicIdChanged =
+      payload.vendorPublicId !== undefined &&
+      payload.vendorPublicId !==
+        expense.vendorPublicId;
+
+    if (
+      vendorNameChanged ||
+      vendorPublicIdChanged
+    ) {
+      throw new ApiError(
+        409,
+        "EXPENSE_VENDOR_SNAPSHOT_IMMUTABLE",
+        "Vendor snapshot fields of an expense linked to a vendor cannot be changed directly.",
+      );
+    }
   }
   private async resolveExpenseAttribution(
     params: ResolveExpenseAttributionParams,

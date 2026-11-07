@@ -21,11 +21,18 @@ export class VendorRepository {
         return repository.save(vendor)
     }
 
-    findExistingByCompanyAndName(params: {
-        companyId: number
-        name: string
-    }) {
-        return this.repository.findOne({
+    findExistingByCompanyAndName(
+        params: {
+            companyId: number
+            name: string
+        },
+        manager?: EntityManager
+    ) {
+        const repository = manager
+            ? manager.getRepository(VendorEntity)
+            : this.repository
+
+        return repository.findOne({
         where: {
             companyId: params.companyId,
             name: params.name,
@@ -63,10 +70,14 @@ export class VendorRepository {
         return query.orderBy('vendor.name', 'ASC').getMany()
     }
 
-    findByPublicId(publicId: string) {
+    findByPublicId(
+        publicId: string,
+        companyId: number
+    ) {
         return this.repository.findOne({
         where: {
             publicId,
+            companyId,
             deletedAt: IsNull(),
         },
         })

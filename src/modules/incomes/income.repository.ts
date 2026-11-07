@@ -204,10 +204,14 @@ export class IncomeRepository {
     };
   }
 
-  findByPublicId(publicId: string) {
+  findByPublicId(
+    publicId: string,
+    companyId: number,
+  ) {
     return this.repository.findOne({
       where: {
         publicId,
+        companyId,
         deletedAt: IsNull(),
       },
       relations: {

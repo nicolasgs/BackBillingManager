@@ -1,3 +1,4 @@
+import { EntityManager } from 'typeorm'
 import { AppDataSource } from '../../bootstrap/database'
 import { BillingAuditLogEntity } from './audit-log.entity'
 import { AuditLogFilters } from './interfaces/audit-log-filters.interface'
@@ -5,12 +6,26 @@ import { AuditLogFilters } from './interfaces/audit-log-filters.interface'
 export class AuditLogRepository {
   private repository = AppDataSource.getRepository(BillingAuditLogEntity)
 
-  createEntity(payload: Partial<BillingAuditLogEntity>) {
-    return this.repository.create(payload)
+  createEntity(
+    payload: Partial<BillingAuditLogEntity>,
+    manager?: EntityManager
+  ) {
+    const repository = manager
+      ? manager.getRepository(BillingAuditLogEntity)
+      : this.repository
+
+    return repository.create(payload)
   }
 
-  save(log: BillingAuditLogEntity) {
-    return this.repository.save(log)
+  save(
+    log: BillingAuditLogEntity,
+    manager?: EntityManager
+  ) {
+    const repository = manager
+      ? manager.getRepository(BillingAuditLogEntity)
+      : this.repository
+
+    return repository.save(log)
   }
 
   findAll(filters: AuditLogFilters) {

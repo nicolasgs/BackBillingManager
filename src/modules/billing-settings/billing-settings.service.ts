@@ -2,8 +2,14 @@ import { AppDataSource } from "../../bootstrap/database";
 
 import { ApiError } from "../../shared/errors";
 
-import { BillingCategoryType } from "../../shared/enums";
+import {
+  AuditAction,
+  AuditEntityType,
+  BillingCategoryType,
+} from "../../shared/enums";
+import { AuthContext } from "../audit-logs/interfaces/auth-context.interface";
 
+import { AuditLogService } from "../audit-logs/audit-log.service";
 import { BillingCategoryRepository } from "../billing-categories/billing-category.repository";
 
 import type { UpdateBillingSettingsDto } from "./dto/billing-settings.dto";
@@ -15,6 +21,8 @@ export class BillingSettingsService {
     private readonly repository = new BillingSettingsRepository(),
 
     private readonly categoryRepository = new BillingCategoryRepository(),
+
+    private readonly auditLogService = new AuditLogService(),
   ) {}
 
   async findByCompany(companyId: number) {
@@ -27,6 +35,7 @@ export class BillingSettingsService {
       companyPublicId?: string | null;
       createdBy?: string;
     },
+    authContext?: AuthContext,
   ) {
     return AppDataSource.transaction(
       async (manager) => {
@@ -70,10 +79,24 @@ export class BillingSettingsService {
         }
 
         let settings =
-          await this.repository.findByCompanyId(
+          await this.repository.findByCompanyIdForUpdate(
             payload.companyId,
             manager,
           );
+
+        const isCreate = !settings;
+
+        const oldValues = settings
+          ? {
+              crmPaymentIncomeCategoryId:
+                settings.crmPaymentIncomeCategoryId ??
+                null,
+
+              companyPublicId:
+                settings.companyPublicId ??
+                null,
+            }
+          : null;
 
         if (!settings) {
           settings = this.repository.createEntity(
@@ -94,14 +117,81 @@ export class BillingSettingsService {
           settings.crmPaymentIncomeCategoryId =
             payload.crmPaymentIncomeCategoryId;
 
-          if (payload.companyPublicId !== undefined) {
+          if (
+            payload.companyPublicId !==
+            undefined
+          ) {
             settings.companyPublicId =
               payload.companyPublicId;
           }
         }
 
-        return this.repository.save(
-          settings,
+        const newValues = {
+          crmPaymentIncomeCategoryId:
+            settings.crmPaymentIncomeCategoryId ??
+            null,
+
+          companyPublicId:
+            settings.companyPublicId ??
+            null,
+        };
+
+        const hasChanges =
+          isCreate ||
+          oldValues
+            ?.crmPaymentIncomeCategoryId !==
+            newValues.crmPaymentIncomeCategoryId ||
+          oldValues
+            ?.companyPublicId !==
+            newValues.companyPublicId;
+
+        if (hasChanges) {
+          settings =
+            await this.repository.save(
+              settings,
+              manager,
+            );
+
+          await this.auditLogService.log(
+            {
+              companyId:
+                settings.companyId,
+
+              companyPublicId:
+                settings.companyPublicId ??
+                null,
+
+              entityType:
+                AuditEntityType.BILLING_SETTINGS,
+
+              entityId:
+                settings.id,
+
+              entityPublicId:
+                settings.publicId,
+
+              action:
+                isCreate
+                  ? AuditAction.CREATE
+                  : AuditAction.UPDATE,
+
+              oldValues,
+
+              newValues,
+
+              authContext,
+            },
+            manager,
+          );
+        }
+
+        /*
+         * Reload so the returned
+         * crmPaymentIncomeCategory relation always
+         * matches the FK that was just persisted.
+         */
+        return this.repository.findByCompanyId(
+          payload.companyId,
           manager,
         );
       },

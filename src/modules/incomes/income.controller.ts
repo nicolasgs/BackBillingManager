@@ -234,11 +234,16 @@ export class IncomeController {
         });
       }
 
-      const receipt = await receiptService.createForIncome(
-        publicId,
-        companyId,
-        req.user?.id,
-      );
+      const authContext =
+        buildAuthContext(req);
+
+      const receipt =
+        await receiptService.createForIncome(
+          publicId,
+          companyId,
+          req.user?.id,
+          authContext,
+        );
 
       return sendSuccess({
         res,

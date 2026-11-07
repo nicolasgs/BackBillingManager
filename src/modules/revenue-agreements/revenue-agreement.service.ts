@@ -194,10 +194,41 @@ export class RevenueAgreementService {
             );
 
           try {
-            return await this.repository.save(
-              entity,
+            const agreement =
+              await this.repository.save(
+                entity,
+                manager,
+              );
+
+            await this.auditLogService.log(
+              {
+                companyId:
+                  agreement.companyId,
+
+                companyPublicId:
+                  agreement.companyPublicId,
+
+                entityType:
+                  AuditEntityType.REVENUE_AGREEMENT,
+
+                entityId:
+                  agreement.id,
+
+                entityPublicId:
+                  agreement.publicId,
+
+                action:
+                  AuditAction.CREATE,
+
+                newValues:
+                  agreement,
+
+                authContext,
+              },
               manager,
             );
+
+            return agreement;
           } catch (error: any) {
             /*
              * PostgreSQL unique-index protection
@@ -217,30 +248,6 @@ export class RevenueAgreementService {
         },
       );
 
-    await this.auditLogService.log({
-      companyId:
-        agreement.companyId,
-
-      companyPublicId:
-        agreement.companyPublicId,
-
-      entityType:
-        AuditEntityType.REVENUE_AGREEMENT,
-
-      entityId:
-        agreement.id,
-
-      entityPublicId:
-        agreement.publicId,
-
-      action:
-        AuditAction.CREATE,
-
-      newValues:
-        agreement,
-
-      authContext,
-    });
 
     return agreement;
   }
@@ -257,6 +264,7 @@ export class RevenueAgreementService {
     const agreement =
       await this.repository.findByPublicId(
         publicId,
+        companyId,
       );
 
     if (
@@ -356,6 +364,38 @@ export class RevenueAgreementService {
               manager,
             );
 
+          await this.auditLogService.log(
+            {
+              companyId:
+                updated.companyId,
+
+              companyPublicId:
+                updated.companyPublicId,
+
+              entityType:
+                AuditEntityType.REVENUE_AGREEMENT,
+
+              entityId:
+                updated.id,
+
+              entityPublicId:
+                updated.publicId,
+
+              action:
+                AuditAction.UPDATE,
+
+              oldValues,
+
+              newValues: {
+                endedAt:
+                  updated.endedAt,
+              },
+
+              authContext,
+            },
+            manager,
+          );
+
           return {
             agreement: updated,
             changed: true,
@@ -368,39 +408,6 @@ export class RevenueAgreementService {
       return transactionResult.agreement;
     }
 
-    const updated =
-      transactionResult.agreement;
-
-    await this.auditLogService.log({
-      companyId:
-        updated.companyId,
-
-      companyPublicId:
-        updated.companyPublicId,
-
-      entityType:
-        AuditEntityType.REVENUE_AGREEMENT,
-
-      entityId:
-        updated.id,
-
-      entityPublicId:
-        updated.publicId,
-
-      action:
-        AuditAction.UPDATE,
-
-      oldValues:
-        transactionResult.oldValues,
-
-      newValues: {
-        endedAt:
-          updated.endedAt,
-      },
-
-      authContext,
-    });
-
-    return updated;
+    return transactionResult.agreement;
   }
 }

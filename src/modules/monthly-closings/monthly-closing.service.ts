@@ -1,3 +1,4 @@
+import { AppDataSource } from "../../bootstrap/database";
 import {
   AuditAction,
   AuditEntityType,
@@ -20,69 +21,99 @@ export class MonthlyClosingService {
     private readonly auditLogService = new AuditLogService(),
   ) {}
 
-  async create(payload: CreateMonthlyClosingDto, authContext?: AuthContext) {
-    const existing = await this.repository.findExistingPeriod(
-      payload.companyId,
-      payload.year,
-      payload.month,
-    );
+  async create(
+    payload: CreateMonthlyClosingDto,
+    authContext?: AuthContext,
+  ) {
+    return AppDataSource.transaction(
+      async (manager) => {
+        const existing =
+          await this.repository.findExistingPeriod(
+            payload.companyId,
+            payload.year,
+            payload.month,
+            manager,
+          );
 
-    if (existing) {
-      throw new ApiError(
-        409,
-        "MONTHLY_CLOSING_ALREADY_EXISTS",
-        "Monthly closing already exists for this company and period",
-      );
-    }
+        if (existing) {
+          throw new ApiError(
+            409,
+            "MONTHLY_CLOSING_ALREADY_EXISTS",
+            "Monthly closing already exists for this company and period",
+          );
+        }
 
-    const closingEntity = this.repository.createEntity({
-      ...payload,
-      status: ClosingStatus.DRAFT,
-      totalIncome: 0,
-      totalExpense: 0,
-      netAmount: 0,
-    });
+        const closingEntity =
+          this.repository.createEntity(
+            {
+              ...payload,
+              status: ClosingStatus.DRAFT,
+              totalIncome: 0,
+              totalExpense: 0,
+              netAmount: 0,
+            },
+            manager,
+          );
 
-    let closing;
+        let closing;
 
-    try {
-      closing = await this.repository.save(closingEntity);
-    } catch (error: any) {
-      if (
-        error?.code === "23505" &&
-        error?.constraint ===
-          "uq_monthly_closings_company_period"
-      ) {
-        throw new ApiError(
-          409,
-          "MONTHLY_CLOSING_ALREADY_EXISTS",
-          "Monthly closing already exists for this company and period",
+        try {
+          closing =
+            await this.repository.save(
+              closingEntity,
+              manager,
+            );
+        } catch (error: any) {
+          if (
+            error?.code === "23505" &&
+            error?.constraint ===
+              "uq_monthly_closings_company_period"
+          ) {
+            throw new ApiError(
+              409,
+              "MONTHLY_CLOSING_ALREADY_EXISTS",
+              "Monthly closing already exists for this company and period",
+            );
+          }
+
+          throw error;
+        }
+
+        await this.auditLogService.log(
+          {
+            companyId:
+              closing.companyId,
+            companyPublicId:
+              closing.companyPublicId,
+            entityType:
+              AuditEntityType.MONTHLY_CLOSING,
+            entityId:
+              closing.id,
+            entityPublicId:
+              closing.publicId,
+            action:
+              AuditAction.CREATE,
+            newValues:
+              closing,
+            authContext,
+          },
+          manager,
         );
-      }
 
-      throw error;
-    }
-
-    await this.auditLogService.log({
-      companyId: closing.companyId,
-      companyPublicId: closing.companyPublicId,
-      entityType: AuditEntityType.MONTHLY_CLOSING,
-      entityId: closing.id,
-      entityPublicId: closing.publicId,
-      action: AuditAction.CREATE,
-      newValues: closing,
-      authContext,
-    });
-
-    return closing;
+        return closing;
+      },
+    );
   }
-
   async findAll(filters: MonthlyClosingFilters) {
     return this.repository.findAll(filters);
   }
 
   async findByPublicId(publicId: string, companyId: number) {
-    const closing = await this.repository.findByPublicId(publicId);
+    const closing =
+      await this.repository.findByPublicId(
+        publicId,
+        companyId,
+      );
 
     if (!closing || closing.companyId !== companyId) {
       throw new ApiError(
@@ -102,9 +133,16 @@ export class MonthlyClosingService {
     closedBy: string,
     authContext?: AuthContext,
   ) {
-    const closing = await this.findByPublicId(publicId, companyId);
+    const initialClosing =
+      await this.findByPublicId(
+        publicId,
+        companyId,
+      );
 
-    if (closing.status === ClosingStatus.CLOSED) {
+    if (
+      initialClosing.status ===
+      ClosingStatus.CLOSED
+    ) {
       throw new ApiError(
         400,
         "MONTHLY_CLOSING_ALREADY_CLOSED",
@@ -112,53 +150,97 @@ export class MonthlyClosingService {
       );
     }
 
-    const originalStatus = closing.status;
+    return AppDataSource.transaction(
+      async (manager) => {
+        const snapshot =
+          await this.repository.closeWithSnapshots(
+            {
+              closingId:
+                initialClosing.id,
+              companyId,
+              closingType:
+                payload.closingType,
+              closedBy,
+            },
+            manager,
+          );
 
-    const snapshot =
-      await this.repository.closeWithSnapshots({
-        closingId: closing.id,
-        companyId: closing.companyId,
-        closingType: payload.closingType,
-        closedBy,
-      });
-    const result = await this.findByPublicId(publicId, companyId);
+        const result =
+          await this.repository.findByPublicId(
+            publicId,
+            companyId,
+            manager,
+          );
 
-    await this.auditLogService.log({
-      companyId: result.companyId,
-      companyPublicId: result.companyPublicId,
-      entityType: AuditEntityType.MONTHLY_CLOSING,
-      entityId: result.id,
-      entityPublicId: result.publicId,
-      action: AuditAction.CLOSE,
-      oldValues: {
-        status: originalStatus,
+        if (!result) {
+          throw new ApiError(
+            404,
+            "MONTHLY_CLOSING_NOT_FOUND",
+            "Monthly closing not found",
+          );
+        }
+
+        await this.auditLogService.log(
+          {
+            companyId:
+              result.companyId,
+            companyPublicId:
+              result.companyPublicId,
+            entityType:
+              AuditEntityType.MONTHLY_CLOSING,
+            entityId:
+              result.id,
+            entityPublicId:
+              result.publicId,
+            action:
+              AuditAction.CLOSE,
+            oldValues: {
+              status:
+                snapshot.originalStatus,
+            },
+            newValues: {
+              status:
+                result.status,
+              closingType:
+                result.closingType,
+              totalIncome:
+                result.totalIncome,
+              totalExpense:
+                result.totalExpense,
+              netAmount:
+                result.netAmount,
+              closedBy:
+                result.closedBy,
+              closedAt:
+                result.closedAt,
+              participantStatementCount:
+                snapshot.participantStatementCount,
+            },
+            authContext,
+          },
+          manager,
+        );
+
+        return result;
       },
-      newValues: {
-        status: result.status,
-        closingType: result.closingType,
-        totalIncome: result.totalIncome,
-        totalExpense: result.totalExpense,
-        netAmount: result.netAmount,
-        closedBy: result.closedBy,
-        closedAt: result.closedAt,
-        participantStatementCount:
-          snapshot.participantStatementCount,
-      },
-      authContext,
-    });
-
-    return result;
+    );
   }
-
   async reopen(
     publicId: string,
     payload: ReopenMonthlyClosingDto,
     companyId: number,
     authContext?: AuthContext,
   ) {
-    const closing = await this.findByPublicId(publicId, companyId);
+    const initialClosing =
+      await this.findByPublicId(
+        publicId,
+        companyId,
+      );
 
-    if (closing.status !== ClosingStatus.CLOSED) {
+    if (
+      initialClosing.status !==
+      ClosingStatus.CLOSED
+    ) {
       throw new ApiError(
         400,
         "MONTHLY_CLOSING_NOT_CLOSED",
@@ -166,39 +248,69 @@ export class MonthlyClosingService {
       );
     }
 
-    const oldValues = {
-      status: closing.status,
-      closedBy: closing.closedBy,
-      closedAt: closing.closedAt,
-      notes: closing.notes,
-    };
+    return AppDataSource.transaction(
+      async (manager) => {
+        const transactionResult =
+          await this.repository
+            .reopenWithSettlementGuard(
+              {
+                closingId:
+                  initialClosing.id,
+                companyId,
+                notes:
+                  payload.notes,
+              },
+              manager,
+            );
 
-    const notes = payload.notes ?? closing.notes;
-    await this.repository.reopenWithSettlementGuard({
-      closingId: closing.id,
-      companyId: closing.companyId,
-      notes,
-    });
+        const result =
+          await this.repository.findByPublicId(
+            publicId,
+            companyId,
+            manager,
+          );
 
-    const result = await this.findByPublicId(publicId, companyId);
+        if (!result) {
+          throw new ApiError(
+            404,
+            "MONTHLY_CLOSING_NOT_FOUND",
+            "Monthly closing not found",
+          );
+        }
 
-    await this.auditLogService.log({
-      companyId: result.companyId,
-      companyPublicId: result.companyPublicId,
-      entityType: AuditEntityType.MONTHLY_CLOSING,
-      entityId: result.id,
-      entityPublicId: result.publicId,
-      action: AuditAction.REOPEN,
-      oldValues,
-      newValues: {
-        status: result.status,
-        notes: result.notes,
-        closedBy: result.closedBy,
-        closedAt: result.closedAt,
+        await this.auditLogService.log(
+          {
+            companyId:
+              result.companyId,
+            companyPublicId:
+              result.companyPublicId,
+            entityType:
+              AuditEntityType.MONTHLY_CLOSING,
+            entityId:
+              result.id,
+            entityPublicId:
+              result.publicId,
+            action:
+              AuditAction.REOPEN,
+            oldValues:
+              transactionResult.oldValues,
+            newValues: {
+              status:
+                result.status,
+              notes:
+                result.notes,
+              closedBy:
+                result.closedBy,
+              closedAt:
+                result.closedAt,
+            },
+            authContext,
+          },
+          manager,
+        );
+
+        return result;
       },
-      authContext,
-    });
-
-    return result;
+    );
   }
 }

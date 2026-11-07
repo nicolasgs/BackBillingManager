@@ -59,23 +59,44 @@ export class BillingCategoryService {
             manager
           )
 
-        return this.repository.save(
-          categoryEntity,
+        const category =
+          await this.repository.save(
+            categoryEntity,
+            manager
+          )
+
+        await this.auditLogService.log(
+          {
+            companyId:
+              category.companyId,
+
+            companyPublicId:
+              category.companyPublicId,
+
+            entityType:
+              AuditEntityType.BILLING_CATEGORY,
+
+            entityId:
+              category.id,
+
+            entityPublicId:
+              category.publicId,
+
+            action:
+              AuditAction.CREATE,
+
+            newValues:
+              category,
+
+            authContext,
+          },
           manager
         )
+
+        return category
       }
     )
 
-    await this.auditLogService.log({
-      companyId: category.companyId,
-      companyPublicId: category.companyPublicId,
-      entityType: AuditEntityType.BILLING_CATEGORY,
-      entityId: category.id,
-      entityPublicId: category.publicId,
-      action: AuditAction.CREATE,
-      newValues: category,
-      authContext,
-    })
 
     return category
   }
@@ -187,6 +208,37 @@ export class BillingCategoryService {
               manager
             )
 
+          await this.auditLogService.log(
+            {
+              companyId:
+                updatedCategory.companyId,
+
+              companyPublicId:
+                updatedCategory.companyPublicId,
+
+              entityType:
+                AuditEntityType.BILLING_CATEGORY,
+
+              entityId:
+                updatedCategory.id,
+
+              entityPublicId:
+                updatedCategory.publicId,
+
+              action:
+                AuditAction.UPDATE,
+
+              oldValues:
+                originalCategory,
+
+              newValues:
+                updatedCategory,
+
+              authContext,
+            },
+            manager
+          )
+
           return {
             originalCategory,
             updatedCategory,
@@ -194,34 +246,6 @@ export class BillingCategoryService {
         }
       )
 
-    await this.auditLogService.log({
-      companyId:
-        transactionResult
-          .updatedCategory
-          .companyId,
-      companyPublicId:
-        transactionResult
-          .updatedCategory
-          .companyPublicId,
-      entityType:
-        AuditEntityType.BILLING_CATEGORY,
-      entityId:
-        transactionResult
-          .updatedCategory
-          .id,
-      entityPublicId:
-        transactionResult
-          .updatedCategory
-          .publicId,
-      action: AuditAction.UPDATE,
-      oldValues:
-        transactionResult
-          .originalCategory,
-      newValues:
-        transactionResult
-          .updatedCategory,
-      authContext,
-    })
 
     return transactionResult
       .updatedCategory
@@ -274,20 +298,38 @@ export class BillingCategoryService {
             manager
           )
 
+          await this.auditLogService.log(
+            {
+              companyId:
+                lockedCategory.companyId,
+
+              companyPublicId:
+                lockedCategory.companyPublicId,
+
+              entityType:
+                AuditEntityType.BILLING_CATEGORY,
+
+              entityId:
+                lockedCategory.id,
+
+              entityPublicId:
+                lockedCategory.publicId,
+
+              action:
+                AuditAction.DELETE,
+
+              oldValues:
+                lockedCategory,
+
+              authContext,
+            },
+            manager
+          )
+
           return lockedCategory
         }
       )
 
-    await this.auditLogService.log({
-      companyId: category.companyId,
-      companyPublicId: category.companyPublicId,
-      entityType: AuditEntityType.BILLING_CATEGORY,
-      entityId: category.id,
-      entityPublicId: category.publicId,
-      action: AuditAction.DELETE,
-      oldValues: category,
-      authContext,
-    })
 
     return {
       publicId: category.publicId,

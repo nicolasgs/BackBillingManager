@@ -52,4 +52,24 @@ export class BillingSettingsRepository {
       },
     });
   }
+
+  findByCompanyIdForUpdate(
+    companyId: number,
+    manager: EntityManager,
+  ) {
+    return manager
+      .getRepository(BillingSettingsEntity)
+      .createQueryBuilder("settings")
+      .where(
+        "settings.companyId = :companyId",
+        {
+          companyId,
+        },
+      )
+      .andWhere(
+        "settings.deletedAt IS NULL",
+      )
+      .setLock("pessimistic_write")
+      .getOne();
+  }
 }
