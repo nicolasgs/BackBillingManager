@@ -4,7 +4,6 @@ import helmet from 'helmet'
 import routes from './routes'
 import { errorMiddleware } from './middlewares/error.middleware'
 import { notFoundMiddleware } from './middlewares/not-found.middleware'
-import { setupSwagger } from './bootstrap/swagger'
 import { env } from './config/env'
 
 const app = express()
@@ -31,9 +30,18 @@ app.use(
   })
 )
 app.use(express.json())
+if (
+  env.NODE_ENV !== 'production' &&
+  env.SWAGGER_ENABLED
+) {
+  // Swagger tooling is development-only. Keeping the require
+  // inside this guard prevents production from loading optional
+  // documentation dependencies.
+  const { setupSwagger } =
+    require('./bootstrap/swagger')
 
-setupSwagger(app)
-
+  setupSwagger(app)
+}
 app.use('/api/v1', routes)
 
 app.use(notFoundMiddleware)
